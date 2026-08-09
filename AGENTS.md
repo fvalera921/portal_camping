@@ -154,7 +154,7 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
   adaptador better-sqlite3 — con la salvedad de que ese mutex es solo intra-proceso, revisar
   al migrar a Postgres o desplegar multi-proceso; acotado el historial de `app/parcelas/[numero]`
   con `select`+`take: 50` y evitada la query de tarifas cuando la parcela no está LIBRE).
-- **Fase 4** ⏳ — suite de tests completa (36 tests): `lib/__tests__/precios.test.ts` (cálculo
+- **Fase 4** ✅ — suite de tests completa (36 tests): `lib/__tests__/precios.test.ts` (cálculo
   de subtotales/totales), `lib/__tests__/solapamiento.test.ts` (integración contra una BD
   SQLite real y aislada por test file — ver `lib/__tests__/helpers/testDb.ts`, que aplica las
   migraciones reales del proyecto; cubre solapamiento total/parcial/contenido, contiguas en
@@ -165,6 +165,18 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
   medianoche UTC) en vez de `parseFechaISO`/construcción por componentes (medianoche local) da
   fechas distintas y falseaba el resultado. Confirma por qué `AGENTS.md` insiste en no usar
   `new Date(string)` para fechas de negocio en ningún sitio del proyecto, tests incluidos.
+  Revisada por security-reviewer (hallazgo bajo: `crearClientePrueba` no validaba el nombre de
+  fichero recibido, riesgo de mantenimiento futuro si alguien pasa una ruta fuera de `prisma/`;
+  ahora valida contra un patrón `test-*.db`) y performance-optimizer (hallazgos bajos de
+  limpieza de recursos: `crearClientePrueba` ahora borra los 4 sufijos SQLite antes de crear el
+  fichero, no solo el principal, y el bucle de migraciones va en `try/finally` para no dejar el
+  handle de `better-sqlite3` abierto si una migración falla). Con el proyecto completo: 36 tests
+  en verde, build/lint/typecheck limpios en las 4 fases.
+
+**Todas las fases del plan original están completas.** Próximos pasos naturales si se retoma el
+proyecto: autenticación real (enganchar sobre `lib/auth.ts`), edición de tarifas desde la UI
+(`PATCH /api/tarifas`, hoy solo hay `GET`), rate limiting en los endpoints mutantes, y paginación
+del historial de reservas si una parcela supera las 50 reservas (`app/parcelas/[numero]/page.tsx`).
 
 <!-- BEGIN:nextjs-agent-rules -->
 
