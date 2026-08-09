@@ -61,6 +61,7 @@ model Reserva {
   updatedAt DateTime @updatedAt
 
   @@index([parcelaId, fechaEntrada, fechaSalida])
+  @@index([estado, fechaEntrada, fechaSalida])
 }
 
 model LineaConcepto {

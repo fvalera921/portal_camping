@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ParcelaConEstado, EstadoParcela } from "@/lib/estadoParcela";
 import type { TipoParcela } from "@/app/generated/prisma/enums";
 
@@ -40,7 +41,7 @@ const ETIQUETA_TIPO: Record<TipoParcela, string> = {
   AUTOCARAVANA: "Autocaravana",
 };
 
-export default function ParcelaCelda({ parcela }: { parcela: ParcelaConEstado }) {
+function ParcelaCelda({ parcela }: { parcela: ParcelaConEstado }) {
   const estilo = ESTILO_ESTADO[parcela.estado];
   const descripcion = `Parcela ${parcela.numero}, ${ETIQUETA_TIPO[parcela.tipo]}${
     parcela.tieneElectricidad ? ", con electricidad" : ""
@@ -69,3 +70,5 @@ export default function ParcelaCelda({ parcela }: { parcela: ParcelaConEstado })
     </div>
   );
 }
+
+export default memo(ParcelaCelda);

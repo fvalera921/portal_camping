@@ -128,7 +128,12 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
   `LineaConcepto.reservaId`). Pendiente a vigilar en Fase 2: el índice compuesto de `Reserva`
   lleva `parcelaId` como columna líder — si el endpoint del mapa consulta reservas por rango de
   fecha sin filtrar por parcela, valorar un índice adicional `(estado, fechaEntrada, fechaSalida)`.
-- **Fase 2** ⏳ — mapa visual de parcelas.
+- **Fase 2** ✅ — mapa visual de las 100 parcelas, `GET /api/parcelas?fecha=`, filtros,
+  contadores. Revisada por security-reviewer (sin hallazgos bloqueantes; detectó que
+  `lib/auth.ts` estaba documentado pero no creado — ya añadido) y performance-optimizer
+  (añadido índice `Reserva(estado, fechaEntrada, fechaSalida)` para la query del mapa, que no
+  usaba el índice existente por no filtrar por `parcelaId`; `ParcelaCelda` y
+  `ContadoresOcupacion` memoizados con `React.memo`/`useMemo`).
 - **Fase 3** ⏳ — panel de reserva, detalle de parcela, checkout.
 - **Fase 4** ⏳ — validaciones endurecidas + suite de tests completa.
 

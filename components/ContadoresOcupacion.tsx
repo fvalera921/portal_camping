@@ -1,11 +1,23 @@
+import { memo, useMemo } from "react";
 import type { ParcelaConEstado } from "@/lib/estadoParcela";
 
-export default function ContadoresOcupacion({ parcelas }: { parcelas: ParcelaConEstado[] }) {
-  const total = parcelas.length;
-  const libres = parcelas.filter((p) => p.estado === "LIBRE").length;
-  const ocupadas = parcelas.filter((p) => p.estado === "OCUPADA").length;
-  const reservadas = parcelas.filter((p) => p.estado === "RESERVADA").length;
-  const porcentajeOcupacion = total === 0 ? 0 : Math.round((ocupadas / total) * 100);
+function ContadoresOcupacion({ parcelas }: { parcelas: ParcelaConEstado[] }) {
+  const { libres, ocupadas, reservadas, porcentajeOcupacion } = useMemo(() => {
+    const conteo = parcelas.reduce(
+      (acc, p) => {
+        acc[p.estado] += 1;
+        return acc;
+      },
+      { LIBRE: 0, OCUPADA: 0, RESERVADA: 0 },
+    );
+    const totalParcelas = parcelas.length;
+    return {
+      libres: conteo.LIBRE,
+      ocupadas: conteo.OCUPADA,
+      reservadas: conteo.RESERVADA,
+      porcentajeOcupacion: totalParcelas === 0 ? 0 : Math.round((conteo.OCUPADA / totalParcelas) * 100),
+    };
+  }, [parcelas]);
 
   return (
     <dl className="flex flex-wrap gap-3 text-sm">
@@ -28,3 +40,5 @@ export default function ContadoresOcupacion({ parcelas }: { parcelas: ParcelaCon
     </dl>
   );
 }
+
+export default memo(ContadoresOcupacion);
