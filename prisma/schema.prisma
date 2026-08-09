@@ -1,0 +1,82 @@
+// Prisma schema — Portal Camping
+// Ver agents.md para las reglas de negocio (dinero en céntimos, precios congelados, solapamientos).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum TipoParcela {
+  TIENDA
+  CARAVANA
+  AUTOCARAVANA
+}
+
+enum Temporada {
+  BAJA
+  ALTA
+}
+
+enum EstadoReserva {
+  CONFIRMADA
+  EN_CURSO
+  FINALIZADA
+  CANCELADA
+}
+
+model Parcela {
+  id                Int       @id @default(autoincrement())
+  numero            Int       @unique
+  tipo              TipoParcela
+  tieneElectricidad Boolean   @default(false)
+  notas             String?
+  reservas          Reserva[]
+}
+
+model Reserva {
+  id     Int     @id @default(autoincrement())
+  parcelaId Int
+  parcela   Parcela @relation(fields: [parcelaId], references: [id])
+
+  fechaEntrada DateTime
+  fechaSalida  DateTime
+  temporada    Temporada
+
+  clienteNombre    String
+  clienteDocumento String
+  clienteTelefono  String
+  clienteEmail     String?
+  matricula        String?
+
+  totalCentimos Int
+  estado        EstadoReserva @default(CONFIRMADA)
+
+  lineas LineaConcepto[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parcelaId, fechaEntrada, fechaSalida])
+}
+
+model LineaConcepto {
+  id        Int     @id @default(autoincrement())
+  reservaId Int
+  reserva   Reserva @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+
+  concepto               String
+  cantidad               Int
+  precioUnitarioCentimos Int
+  subtotalCentimos       Int
+}
+
+model Tarifa {
+  id                 Int    @id @default(autoincrement())
+  concepto           String @unique
+  precioBajaCentimos Int
+  precioAltaCentimos Int
+}
