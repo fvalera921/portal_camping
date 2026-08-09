@@ -28,3 +28,26 @@ export async function existeSolapamiento(
   });
   return solapada !== null;
 }
+
+/**
+ * Igual que existeSolapamiento pero para la asignacion de un frigorifico (solo hay 8, se
+ * comparten entre parcelas). Compara contra frigorificoFechaEntrada/frigorificoFechaSalida,
+ * que puede ser un rango mas corto que el de la reserva.
+ */
+export async function existeSolapamientoFrigorifico(
+  db: ClienteDB,
+  frigorificoId: number,
+  fechaEntrada: Date,
+  fechaSalida: Date,
+): Promise<boolean> {
+  const solapada = await db.reserva.findFirst({
+    where: {
+      frigorificoId,
+      estado: { in: ["CONFIRMADA", "EN_CURSO"] },
+      frigorificoFechaEntrada: { lt: fechaSalida },
+      frigorificoFechaSalida: { gt: fechaEntrada },
+    },
+    select: { id: true },
+  });
+  return solapada !== null;
+}

@@ -12,9 +12,12 @@ const TARIFAS = [
   { concepto: "ELECTRICIDAD", baja: 6.55, alta: 7.65 },
   { concepto: "MOTO", baja: 3.35, alta: 4.35 },
   { concepto: "PERRO", baja: 1.3, alta: 1.3 },
+  // Precio pendiente de confirmar por el cliente del proyecto — 0 € hasta entonces.
+  { concepto: "FRIGORIFICO", baja: 0, alta: 0 },
 ] as const;
 
 const TIPOS_PARCELA = ["TIENDA", "CARAVANA", "AUTOCARAVANA"] as const;
+const NUMERO_FRIGORIFICOS = 8;
 
 async function main() {
   for (const tarifa of TARIFAS) {
@@ -42,7 +45,17 @@ async function main() {
     });
   }
 
-  console.log(`Seed completado: ${TARIFAS.length} tarifas y 100 parcelas.`);
+  for (let numero = 1; numero <= NUMERO_FRIGORIFICOS; numero++) {
+    await prisma.frigorifico.upsert({
+      where: { numero },
+      update: {},
+      create: { numero },
+    });
+  }
+
+  console.log(
+    `Seed completado: ${TARIFAS.length} tarifas, 100 parcelas y ${NUMERO_FRIGORIFICOS} frigorificos.`,
+  );
 }
 
 main()

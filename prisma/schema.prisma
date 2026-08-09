@@ -37,6 +37,13 @@ model Parcela {
   reservas          Reserva[]
 }
 
+/** Recurso compartido del camping: solo hay 8 unidades, numeradas 1-8. */
+model Frigorifico {
+  id       Int       @id @default(autoincrement())
+  numero   Int       @unique
+  reservas Reserva[]
+}
+
 model Reserva {
   id     Int     @id @default(autoincrement())
   parcelaId Int
@@ -52,6 +59,13 @@ model Reserva {
   clienteEmail     String?
   matricula        String?
 
+  // Frigorifico opcional (a lo sumo 1 por reserva). Su rango de fechas es independiente del de
+  // la parcela: por defecto coincide, pero puede ser mas corto. Ver lib/frigorificos.ts.
+  frigorificoId           Int?
+  frigorifico             Frigorifico? @relation(fields: [frigorificoId], references: [id])
+  frigorificoFechaEntrada DateTime?
+  frigorificoFechaSalida  DateTime?
+
   totalCentimos Int
   estado        EstadoReserva @default(CONFIRMADA)
 
@@ -62,6 +76,7 @@ model Reserva {
 
   @@index([parcelaId, fechaEntrada, fechaSalida])
   @@index([estado, fechaEntrada, fechaSalida])
+  @@index([frigorificoId, frigorificoFechaEntrada, frigorificoFechaSalida])
 }
 
 model LineaConcepto {

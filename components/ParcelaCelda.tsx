@@ -5,35 +5,32 @@ import type { TipoParcela } from "@/app/generated/prisma/enums";
 
 const ESTILO_ESTADO: Record<
   EstadoParcela,
-  { fondo: string; borde: string; texto: string; icono: string; etiqueta: string }
+  { fondo: string; borde: string; texto: string; etiqueta: string }
 > = {
   LIBRE: {
     fondo: "bg-emerald-50",
     borde: "border-emerald-500",
     texto: "text-emerald-900",
-    icono: "✓",
     etiqueta: "Libre",
   },
   OCUPADA: {
     fondo: "bg-red-50",
     borde: "border-red-500",
     texto: "text-red-900",
-    icono: "✕",
     etiqueta: "Ocupada",
   },
   RESERVADA: {
     fondo: "bg-amber-50",
     borde: "border-amber-500",
     texto: "text-amber-900",
-    icono: "◗",
     etiqueta: "Reservada",
   },
 };
 
-const ICONO_TIPO: Record<TipoParcela, string> = {
-  TIENDA: "⛺",
-  CARAVANA: "🚐",
-  AUTOCARAVANA: "🚙",
+const ABREVIATURA_TIPO: Record<TipoParcela, string> = {
+  TIENDA: "Tienda",
+  CARAVANA: "Carav.",
+  AUTOCARAVANA: "Autoc.",
 };
 
 const ETIQUETA_TIPO: Record<TipoParcela, string> = {
@@ -56,17 +53,8 @@ function ParcelaCelda({ parcela, fechaISO }: { parcela: ParcelaConEstado; fechaI
       className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border-2 p-1 text-center transition hover:brightness-95 ${estilo.fondo} ${estilo.borde} ${estilo.texto}`}
     >
       <span className="text-xs font-bold">{parcela.numero}</span>
-      <span aria-hidden="true" className="text-base leading-none">
-        {ICONO_TIPO[parcela.tipo]}
-      </span>
-      <span aria-hidden="true" className="text-sm leading-none">
-        {estilo.icono}
-      </span>
-      {parcela.tieneElectricidad && (
-        <span aria-hidden="true" className="text-[10px] leading-none">
-          {"⚡"}
-        </span>
-      )}
+      <span className="text-[10px] leading-none">{ABREVIATURA_TIPO[parcela.tipo]}</span>
+      {parcela.tieneElectricidad && <span className="text-[9px] leading-none">Con luz</span>}
       <span className="text-[9px] leading-none font-medium">{estilo.etiqueta}</span>
     </Link>
   );

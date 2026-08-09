@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { parseFechaISO } from "@/lib/fechas";
+import { diferenciaEnNoches, parseFechaISO } from "@/lib/fechas";
 import { calcularSubtotalCentimos, calcularTotalCentimos } from "@/lib/precios";
-import { existeSolapamiento, fechaSalidaEsValida } from "@/lib/validaciones";
+import {
+  existeSolapamiento,
+  existeSolapamientoFrigorifico,
+  fechaSalidaEsValida,
+} from "@/lib/validaciones";
 import type { Temporada } from "@/app/generated/prisma/enums";
 
 const TEMPORADAS_VALIDAS: readonly Temporada[] = ["BAJA", "ALTA"];
@@ -11,6 +15,8 @@ const MAX_CANTIDAD_POR_LINEA = 99;
 const MAX_LINEAS = 20;
 const MAX_LONGITUD_TEXTO_CORTO = 60;
 const MAX_LONGITUD_TEXTO_LARGO = 200;
+const CONCEPTO_FRIGORIFICO = "FRIGORIFICO";
+const NUMERO_FRIGORIFICOS = 8;
 
 type LineaEntrada = { concepto: string; cantidad: number };
 
@@ -20,6 +26,19 @@ type ClienteEntrada = {
   telefono: string;
   email?: string;
   matricula?: string;
+};
+
+type FrigorificoEntrada = {
+  numero: number;
+  fechaEntrada: Date;
+  fechaSalida: Date;
+};
+
+type LineaCalculada = {
+  concepto: string;
+  cantidad: number;
+  precioUnitarioCentimos: number;
+  subtotalCentimos: number;
 };
 
 function esTextoValido(valor: unknown, longitudMaxima: number, requerido: boolean): boolean {
@@ -48,12 +67,45 @@ function validarLineas(lineas: unknown): lineas is LineaEntrada[] {
       typeof l.concepto === "string" &&
       l.concepto.length > 0 &&
       l.concepto.length <= MAX_LONGITUD_TEXTO_CORTO &&
+      l.concepto !== CONCEPTO_FRIGORIFICO &&
       typeof l.cantidad === "number" &&
       Number.isInteger(l.cantidad) &&
       l.cantidad > 0 &&
       l.cantidad <= MAX_CANTIDAD_POR_LINEA
     );
   });
+}
+
+/** null = sin frigorifico; undefined = payload invalido. */
+function validarFrigorifico(
+  frigorifico: unknown,
+  fechaEntradaReserva: Date,
+  fechaSalidaReserva: Date,
+): FrigorificoEntrada | null | undefined {
+  if (frigorifico === undefined || frigorifico === null) return null;
+  if (typeof frigorifico !== "object") return undefined;
+
+  const f = frigorifico as Record<string, unknown>;
+  if (
+    typeof f.numero !== "number" ||
+    !Number.isInteger(f.numero) ||
+    f.numero < 1 ||
+    f.numero > NUMERO_FRIGORIFICOS
+  ) {
+    return undefined;
+  }
+  if (typeof f.fechaEntrada !== "string" || typeof f.fechaSalida !== "string") {
+    return undefined;
+  }
+  const fechaEntrada = parseFechaISO(f.fechaEntrada);
+  const fechaSalida = parseFechaISO(f.fechaSalida);
+  if (!fechaEntrada || !fechaSalida || !fechaSalidaEsValida(fechaEntrada, fechaSalida)) {
+    return undefined;
+  }
+  if (fechaEntrada < fechaEntradaReserva || fechaSalida > fechaSalidaReserva) {
+    return undefined;
+  }
+  return { numero: f.numero, fechaEntrada, fechaSalida };
 }
 
 export async function POST(request: NextRequest) {
@@ -64,8 +116,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cuerpo de la peticion invalido" }, { status: 400 });
   }
 
-  const { parcelaId, fechaEntrada: fechaEntradaStr, fechaSalida: fechaSalidaStr, temporada, cliente, lineas } =
-    body as Record<string, unknown>;
+  const {
+    parcelaId,
+    fechaEntrada: fechaEntradaStr,
+    fechaSalida: fechaSalidaStr,
+    temporada,
+    cliente,
+    lineas,
+    frigorifico: frigorificoBody,
+  } = body as Record<string, unknown>;
 
   if (typeof parcelaId !== "number" || !Number.isInteger(parcelaId)) {
     return NextResponse.json({ error: "parcelaId invalido" }, { status: 400 });
@@ -96,28 +155,36 @@ export async function POST(request: NextRequest) {
   if (!validarLineas(lineas)) {
     return NextResponse.json({ error: "Lineas de concepto invalidas" }, { status: 400 });
   }
+  const frigorificoEntrada = validarFrigorifico(frigorificoBody, fechaEntrada, fechaSalida);
+  if (frigorificoEntrada === undefined) {
+    return NextResponse.json({ error: "Datos de frigorifico invalidos" }, { status: 400 });
+  }
 
   const parcela = await prisma.parcela.findUnique({ where: { id: parcelaId } });
   if (!parcela) {
     return NextResponse.json({ error: "Parcela no encontrada" }, { status: 404 });
   }
 
-  const noches = Math.round(
-    (fechaSalida.getTime() - fechaEntrada.getTime()) / (24 * 60 * 60 * 1000),
-  );
+  let frigorifico: { id: number; numero: number } | null = null;
+  if (frigorificoEntrada) {
+    frigorifico = await prisma.frigorifico.findUnique({
+      where: { numero: frigorificoEntrada.numero },
+    });
+    if (!frigorifico) {
+      return NextResponse.json({ error: "Frigorifico no encontrado" }, { status: 404 });
+    }
+  }
+
+  const noches = diferenciaEnNoches(fechaEntrada, fechaSalida);
 
   const conceptosSolicitados = [...new Set(lineas.map((linea) => linea.concepto))];
+  if (frigorificoEntrada) conceptosSolicitados.push(CONCEPTO_FRIGORIFICO);
   const tarifas = await prisma.tarifa.findMany({
     where: { concepto: { in: conceptosSolicitados } },
   });
   const tarifaPorConcepto = new Map(tarifas.map((tarifa) => [tarifa.concepto, tarifa]));
 
-  const lineasCalculadas: {
-    concepto: string;
-    cantidad: number;
-    precioUnitarioCentimos: number;
-    subtotalCentimos: number;
-  }[] = [];
+  const lineasCalculadas: LineaCalculada[] = [];
   for (const linea of lineas) {
     const tarifa = tarifaPorConcepto.get(linea.concepto);
     if (!tarifa) {
@@ -136,12 +203,46 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  if (frigorificoEntrada) {
+    const tarifaFrigorifico = tarifaPorConcepto.get(CONCEPTO_FRIGORIFICO);
+    if (!tarifaFrigorifico) {
+      return NextResponse.json(
+        { error: "Tarifa de frigorifico no configurada" },
+        { status: 500 },
+      );
+    }
+    const nochesFrigorifico = diferenciaEnNoches(
+      frigorificoEntrada.fechaEntrada,
+      frigorificoEntrada.fechaSalida,
+    );
+    const precioUnitarioCentimos =
+      temporada === "ALTA" ? tarifaFrigorifico.precioAltaCentimos : tarifaFrigorifico.precioBajaCentimos;
+    lineasCalculadas.push({
+      concepto: CONCEPTO_FRIGORIFICO,
+      cantidad: 1,
+      precioUnitarioCentimos,
+      subtotalCentimos: calcularSubtotalCentimos(1, precioUnitarioCentimos, nochesFrigorifico),
+    });
+  }
+
   const totalCentimos = calcularTotalCentimos(lineasCalculadas);
 
   try {
     const reserva = await prisma.$transaction(async (tx) => {
       if (await existeSolapamiento(tx, parcelaId, fechaEntrada, fechaSalida)) {
-        throw new SolapamientoError();
+        throw new SolapamientoParcelaError();
+      }
+      if (
+        frigorifico &&
+        frigorificoEntrada &&
+        (await existeSolapamientoFrigorifico(
+          tx,
+          frigorifico.id,
+          frigorificoEntrada.fechaEntrada,
+          frigorificoEntrada.fechaSalida,
+        ))
+      ) {
+        throw new SolapamientoFrigorificoError();
       }
       return tx.reserva.create({
         data: {
@@ -154,6 +255,9 @@ export async function POST(request: NextRequest) {
           clienteTelefono: cliente.telefono.trim(),
           clienteEmail: cliente.email?.trim() || null,
           matricula: cliente.matricula?.trim() || null,
+          frigorificoId: frigorifico?.id ?? null,
+          frigorificoFechaEntrada: frigorificoEntrada?.fechaEntrada ?? null,
+          frigorificoFechaSalida: frigorificoEntrada?.fechaSalida ?? null,
           totalCentimos,
           lineas: { create: lineasCalculadas },
         },
@@ -163,9 +267,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(reserva, { status: 201 });
   } catch (error) {
-    if (error instanceof SolapamientoError) {
+    if (error instanceof SolapamientoParcelaError) {
       return NextResponse.json(
         { error: "La parcela ya tiene una reserva que se solapa con esas fechas" },
+        { status: 409 },
+      );
+    }
+    if (error instanceof SolapamientoFrigorificoError) {
+      return NextResponse.json(
+        { error: "Ese frigorifico ya esta asignado en esas fechas" },
         { status: 409 },
       );
     }
@@ -173,4 +283,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-class SolapamientoError extends Error {}
+class SolapamientoParcelaError extends Error {}
+class SolapamientoFrigorificoError extends Error {}

@@ -50,6 +50,9 @@ export default async function ParcelaDetallePage({
           totalCentimos: true,
           clienteNombre: true,
           clienteTelefono: true,
+          frigorificoFechaEntrada: true,
+          frigorificoFechaSalida: true,
+          frigorifico: { select: { numero: true } },
         },
       },
     },
@@ -90,6 +93,13 @@ export default async function ParcelaDetallePage({
             clienteNombre: reservaVigente.clienteNombre,
             clienteTelefono: reservaVigente.clienteTelefono,
             totalCentimos: reservaVigente.totalCentimos,
+            frigorifico: reservaVigente.frigorifico
+              ? {
+                  numero: reservaVigente.frigorifico.numero,
+                  fechaEntrada: formatFechaISO(reservaVigente.frigorificoFechaEntrada!),
+                  fechaSalida: formatFechaISO(reservaVigente.frigorificoFechaSalida!),
+                }
+              : null,
           }}
         />
       )}

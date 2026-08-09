@@ -32,6 +32,7 @@ electricidad, mascotas...), cálculo de totales y check-out.
   api/reservas/route.ts             → POST crear reserva (valida solapamiento en servidor)
   api/reservas/[id]/route.ts        → PATCH checkout / cancelar
   api/tarifas/route.ts              → GET / PATCH tarifas
+  api/frigorificos/route.ts         → GET disponibilidad de los 8 frigorificos para un rango
   generated/prisma/                 → cliente Prisma generado (NO editar a mano, ignorado en git)
 /components                         → componentes de UI (mapa, panel de reserva, etc.)
 /lib
@@ -39,8 +40,9 @@ electricidad, mascotas...), cálculo de totales y check-out.
   dinero.ts         → formatEUR, eurosACentimos — SIEMPRE usar esto, nunca floats a pelo
   temporada.ts      → sugerirTemporada(fechaEntrada, fechaSalida) + esFestivo
   precios.ts        → cálculo de subtotales y totales de una reserva
-  validaciones.ts   → solapamiento de fechas, fechaSalida > fechaEntrada
+  validaciones.ts   → solapamiento de fechas/frigorificos, fechaSalida > fechaEntrada
   estadoParcela.ts  → LIBRE / OCUPADA / RESERVADA para una parcela en una fecha dada
+  frigorificos.ts   → disponibilidad de los 8 frigorificos para un rango de fechas
   auth.ts           → stub de sesión (ver arriba)
 /prisma
   schema.prisma, migrations/, seed.ts
@@ -61,6 +63,16 @@ electricidad, mascotas...), cálculo de totales y check-out.
   de la reserva), `subtotalCentimos` = `cantidad × precioUnitarioCentimos × nº de noches`.
 - **Tarifa**: `concepto` (único), `precioBajaCentimos`, `precioAltaCentimos`. Es la única
   fuente de precios — nunca hardcodear cifras de tarifa en componentes o rutas.
+- **Frigorifico**: recurso compartido del camping, solo **8 unidades** (`numero` 1-8, único).
+  Una `Reserva` puede tener a lo sumo 1 frigorifico asignado (`frigorificoId` nullable +
+  `frigorificoFechaEntrada`/`frigorificoFechaSalida`, también nullable). Ese rango de fechas es
+  **independiente** del de la parcela: por defecto coincide, pero el usuario puede acortarlo
+  (nunca alargarlo más allá del rango de la reserva). Se cobra como una `LineaConcepto` más
+  (`concepto = "FRIGORIFICO"`, `cantidad = 1`), calculada con las noches del rango del
+  frigorifico, no las de la parcela. **Precio pendiente**: el usuario del proyecto confirmó que
+  tiene coste pero no dio la cifra; `Tarifa` tiene la fila `FRIGORIFICO` sembrada a 0 €/0 € como
+  placeholder — actualizar `prisma/seed.ts` (o `Tarifa` directamente) en cuanto se conozca el
+  precio real y volver a correr `npm run db:seed`.
 
 ## Reglas de negocio críticas (no negociables)
 
@@ -80,6 +92,10 @@ electricidad, mascotas...), cálculo de totales y check-out.
    de salida no cuenta.
 6. El estado visual de una parcela depende de la fecha seleccionada en el mapa, no siempre de
    "hoy" — ver `lib/estadoParcela.ts`.
+7. **Frigorificos sin solapamiento**: solo hay 8; la misma regla de solapamiento de parcelas
+   aplica a `Reserva.frigorificoId` + su propio rango de fechas (`existeSolapamientoFrigorifico`
+   en `lib/validaciones.ts`), y su rango debe caer dentro de `[fechaEntrada, fechaSalida]` de
+   la reserva a la que pertenece.
 
 ## Convenciones de código
 
@@ -123,6 +139,11 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
   existirá (usa el stub de `lib/auth.ts`).
 - No introducir Postgres-only features en el schema que compliquen la migración futura sin
   necesidad.
+- No dejar que el rango de fechas de un frigorifico se salga del rango `[fechaEntrada,
+  fechaSalida]` de la reserva a la que pertenece — validar siempre en servidor
+  (`app/api/reservas/route.ts`), no confiar solo en los `min`/`max` del `<input type="date">`.
+- No olvidar actualizar el precio de `FRIGORIFICO` en `Tarifa` (hoy 0 €, placeholder) en cuanto
+  el usuario del proyecto lo confirme.
 
 ## Estado del proyecto (mantener actualizado al final de cada fase)
 
@@ -177,6 +198,33 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
 proyecto: autenticación real (enganchar sobre `lib/auth.ts`), edición de tarifas desde la UI
 (`PATCH /api/tarifas`, hoy solo hay `GET`), rate limiting en los endpoints mutantes, y paginación
 del historial de reservas si una parcela supera las 50 reservas (`app/parcelas/[numero]/page.tsx`).
+
+### Cambios posteriores a la Fase 4
+
+- **UI**: quitados todos los emoticonos del mapa de parcelas (`ParcelaCelda.tsx` ahora usa solo
+  texto para tipo/electricidad/estado, ya accesible sin iconos). Forzado el fondo a blanco
+  siempre (`app/globals.css`): se quitó el bloque `@media (prefers-color-scheme: dark)` que
+  ponía fondo casi negro cuando el sistema operativo tenía tema oscuro.
+- **Frigorificos** (recurso compartido, solo 8 unidades — ver modelo de datos y reglas de
+  negocio más arriba): nuevo modelo `Frigorifico`, campos en `Reserva`
+  (`frigorificoId`/`frigorificoFechaEntrada`/`frigorificoFechaSalida`), `lib/frigorificos.ts`
+  (`obtenerDisponibilidadFrigorificos`, acepta el cliente de Prisma como parámetro igual que
+  `lib/validaciones.ts` para poder testearse contra una BD aislada — **si se añade un helper de
+  consulta nuevo, seguir este patrón, no hardcodear el singleton de `lib/db.ts` dentro**),
+  `existeSolapamientoFrigorifico` en `lib/validaciones.ts`, `GET /api/frigorificos?fechaEntrada=
+  &fechaSalida=`, `POST /api/reservas` extendido para aceptar `frigorifico: { numero,
+  fechaEntrada, fechaSalida } | null` (rechaza si el rango se sale del de la reserva, si el
+  número no existe, o si ese frigorifico ya está asignado en fechas solapadas — comprobado
+  dentro de la misma transacción que el solapamiento de parcela). UI: `SelectorFrigorifico.tsx`
+  dentro de `PanelReserva.tsx`, con disponibilidad en vivo vía fetch a `/api/frigorificos` según
+  cambian las fechas; el número seleccionado se **deriva** de la disponibilidad en vez de
+  corregirse con un efecto (evita el error de lint `react-hooks/set-state-in-effect` de
+  `eslint-config-next` y sigue el patrón recomendado por React de no duplicar estado derivable).
+  9 tests nuevos en `lib/__tests__/solapamientoFrigorifico.test.ts`. **Precio pendiente de
+  confirmar** (ver Reglas de negocio). Verificado manualmente end-to-end: asignación con rango
+  más corto que la parcela, liberación exacta el día que termina, rechazo de solapamiento (409),
+  rechazo de rango fuera de la reserva (400), rechazo de intentar colar `FRIGORIFICO` por el
+  array genérico de `lineas` (400).
 
 <!-- BEGIN:nextjs-agent-rules -->
 

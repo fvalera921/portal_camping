@@ -12,6 +12,7 @@ export type ReservaResumen = {
   clienteNombre: string;
   clienteTelefono: string;
   totalCentimos: number;
+  frigorifico: { numero: number; fechaEntrada: string; fechaSalida: string } | null;
 };
 
 export default function ReservaVigente({
@@ -61,6 +62,15 @@ export default function ReservaVigente({
         <dd className="text-neutral-900">{reserva.fechaSalida}</dd>
         <dt className="text-neutral-500">Total</dt>
         <dd className="font-semibold text-neutral-900">{formatEUR(reserva.totalCentimos)}</dd>
+        {reserva.frigorifico && (
+          <>
+            <dt className="text-neutral-500">Frigorífico</dt>
+            <dd className="text-neutral-900">
+              Nº {reserva.frigorifico.numero} ({reserva.frigorifico.fechaEntrada} –{" "}
+              {reserva.frigorifico.fechaSalida})
+            </dd>
+          </>
+        )}
       </dl>
       {estadoParcela === "OCUPADA" && (
         <button

@@ -1,16 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import SelectorFechas from "@/components/SelectorFechas";
 import SelectorTemporada from "@/components/SelectorTemporada";
 import ListaConceptos, { type Tarifa } from "@/components/ListaConceptos";
 import FormularioCliente, { type DatosCliente } from "@/components/FormularioCliente";
+import SelectorFrigorifico, { type FrigorificoDisponibilidad } from "@/components/SelectorFrigorifico";
 import { formatEUR } from "@/lib/dinero";
 import { calcularSubtotalCentimos, calcularTotalCentimos } from "@/lib/precios";
 import { diferenciaEnNoches, formatFechaISO, parseFechaISO } from "@/lib/fechas";
 import { sugerirTemporada } from "@/lib/temporada";
 import type { Temporada } from "@/app/generated/prisma/enums";
+
+const CONCEPTO_FRIGORIFICO = "FRIGORIFICO";
 
 export default function PanelReserva({
   parcelaId,
@@ -46,10 +49,63 @@ export default function PanelReserva({
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [frigorificoActivo, setFrigorificoActivo] = useState(false);
+  const [frigorificoNumero, setFrigorificoNumero] = useState<number | null>(null);
+  const [frigorificoEntradaISO, setFrigorificoEntradaISO] = useState(fechaEntradaISO);
+  const [frigorificoSalidaISO, setFrigorificoSalidaISO] = useState(fechaSalidaISO);
+  const [disponibilidadFrigorificos, setDisponibilidadFrigorificos] = useState<FrigorificoDisponibilidad[]>([]);
+
+  const tarifasSinFrigorifico = useMemo(
+    () => tarifas.filter((tarifa) => tarifa.concepto !== CONCEPTO_FRIGORIFICO),
+    [tarifas],
+  );
+  const tarifaFrigorifico = useMemo(
+    () => tarifas.find((tarifa) => tarifa.concepto === CONCEPTO_FRIGORIFICO) ?? null,
+    [tarifas],
+  );
+
   const fechaEntrada = parseFechaISO(fechaEntradaISO);
   const fechaSalida = parseFechaISO(fechaSalidaISO);
   const fechasValidas = Boolean(fechaEntrada && fechaSalida && fechaSalida > fechaEntrada);
   const noches = fechaEntrada && fechaSalida ? diferenciaEnNoches(fechaEntrada, fechaSalida) : 0;
+
+  const nochesFrigorifico = useMemo(() => {
+    const entrada = parseFechaISO(frigorificoEntradaISO);
+    const salida = parseFechaISO(frigorificoSalidaISO);
+    return entrada && salida && salida > entrada ? diferenciaEnNoches(entrada, salida) : 0;
+  }, [frigorificoEntradaISO, frigorificoSalidaISO]);
+
+  // Mientras las fechas del frigorifico no sean validas no hay nada que consultar; se muestra
+  // como "sin disponibilidad" derivandolo aqui en vez de resetear el estado desde un efecto.
+  const disponibilidadEfectiva = useMemo(
+    () => (nochesFrigorifico > 0 ? disponibilidadFrigorificos : []),
+    [nochesFrigorifico, disponibilidadFrigorificos],
+  );
+
+  // El numero que el usuario pulso puede haber dejado de estar disponible (p.ej. otra reserva
+  // lo ocupo, o el rango de fechas cambio). Se deriva en vez de "corregir" el estado con un
+  // efecto: si ya no es valido, simplemente se trata como si no hubiera seleccion.
+  const frigorificoNumeroValido = useMemo(() => {
+    if (frigorificoNumero === null) return null;
+    const seleccionado = disponibilidadEfectiva.find((f) => f.numero === frigorificoNumero);
+    return seleccionado?.disponible ? frigorificoNumero : null;
+  }, [frigorificoNumero, disponibilidadEfectiva]);
+
+  useEffect(() => {
+    if (nochesFrigorifico <= 0) return;
+    let cancelado = false;
+    fetch(`/api/frigorificos?fechaEntrada=${frigorificoEntradaISO}&fechaSalida=${frigorificoSalidaISO}`)
+      .then((respuesta) => (respuesta.ok ? respuesta.json() : { frigorificos: [] }))
+      .then((data) => {
+        if (!cancelado) setDisponibilidadFrigorificos(data.frigorificos ?? []);
+      })
+      .catch(() => {
+        if (!cancelado) setDisponibilidadFrigorificos([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [frigorificoEntradaISO, frigorificoSalidaISO, nochesFrigorifico]);
 
   function actualizarTemporadaSugerida(entradaISO: string, salidaISO: string) {
     if (temporadaEditadaManualmente) return;
@@ -60,14 +116,18 @@ export default function PanelReserva({
     }
   }
 
+  // El rango del frigorifico por defecto sigue al de la parcela; si el usuario ya lo habia
+  // acotado manualmente, se recorta aqui mismo para seguir cabiendo dentro del nuevo rango.
   function cambiarFechaEntrada(valor: string) {
     setFechaEntradaISO(valor);
     actualizarTemporadaSugerida(valor, fechaSalidaISO);
+    setFrigorificoEntradaISO((actual) => (actual < valor ? valor : actual));
   }
 
   function cambiarFechaSalida(valor: string) {
     setFechaSalidaISO(valor);
     actualizarTemporadaSugerida(fechaEntradaISO, valor);
+    setFrigorificoSalidaISO((actual) => (actual > valor ? valor : actual));
   }
 
   function cambiarTemporada(valor: Temporada) {
@@ -76,7 +136,7 @@ export default function PanelReserva({
   }
 
   const lineas = useMemo(() => {
-    return tarifas
+    return tarifasSinFrigorifico
       .map((tarifa) => {
         const cantidad = cantidades[tarifa.concepto] ?? 0;
         if (cantidad <= 0) return null;
@@ -90,13 +150,35 @@ export default function PanelReserva({
         };
       })
       .filter((linea): linea is NonNullable<typeof linea> => linea !== null);
-  }, [tarifas, cantidades, temporada, noches]);
+  }, [tarifasSinFrigorifico, cantidades, temporada, noches]);
 
-  const totalCentimos = calcularTotalCentimos(lineas);
+  const precioUnitarioFrigorificoCentimos = tarifaFrigorifico
+    ? temporada === "ALTA"
+      ? tarifaFrigorifico.precioAltaCentimos
+      : tarifaFrigorifico.precioBajaCentimos
+    : null;
+
+  const lineaFrigorifico = useMemo(() => {
+    if (!frigorificoActivo || frigorificoNumeroValido === null || precioUnitarioFrigorificoCentimos === null) {
+      return null;
+    }
+    if (nochesFrigorifico <= 0) return null;
+    return {
+      concepto: CONCEPTO_FRIGORIFICO,
+      cantidad: 1,
+      precioUnitarioCentimos: precioUnitarioFrigorificoCentimos,
+      subtotalCentimos: calcularSubtotalCentimos(1, precioUnitarioFrigorificoCentimos, nochesFrigorifico),
+    };
+  }, [frigorificoActivo, frigorificoNumeroValido, precioUnitarioFrigorificoCentimos, nochesFrigorifico]);
+
+  const totalCentimos = calcularTotalCentimos(lineaFrigorifico ? [...lineas, lineaFrigorifico] : lineas);
+
+  const frigorificoValido = !frigorificoActivo || lineaFrigorifico !== null;
 
   const puedeEnviar =
     fechasValidas &&
     lineas.length > 0 &&
+    frigorificoValido &&
     datosCliente.nombre.trim() !== "" &&
     datosCliente.documento.trim() !== "" &&
     datosCliente.telefono.trim() !== "" &&
@@ -123,6 +205,14 @@ export default function PanelReserva({
             matricula: datosCliente.matricula || undefined,
           },
           lineas: lineas.map((linea) => ({ concepto: linea.concepto, cantidad: linea.cantidad })),
+          frigorifico:
+            frigorificoActivo && frigorificoNumeroValido !== null
+              ? {
+                  numero: frigorificoNumeroValido,
+                  fechaEntrada: frigorificoEntradaISO,
+                  fechaSalida: frigorificoSalidaISO,
+                }
+              : null,
         }),
       });
       if (!respuesta.ok) {
@@ -151,13 +241,33 @@ export default function PanelReserva({
       <SelectorTemporada temporada={temporada} onCambiar={cambiarTemporada} />
 
       <ListaConceptos
-        tarifas={tarifas}
+        tarifas={tarifasSinFrigorifico}
         temporada={temporada}
         noches={noches}
         cantidades={cantidades}
         onCambiarCantidad={(concepto, cantidad) =>
           setCantidades((prev) => ({ ...prev, [concepto]: cantidad }))
         }
+      />
+
+      <SelectorFrigorifico
+        activo={frigorificoActivo}
+        onActivoChange={(valor) => {
+          setFrigorificoActivo(valor);
+          if (!valor) setFrigorificoNumero(null);
+        }}
+        numero={frigorificoNumeroValido}
+        onNumeroChange={setFrigorificoNumero}
+        fechaEntradaISO={frigorificoEntradaISO}
+        fechaSalidaISO={frigorificoSalidaISO}
+        onCambiarFechaEntrada={setFrigorificoEntradaISO}
+        onCambiarFechaSalida={setFrigorificoSalidaISO}
+        fechaEntradaMinISO={fechaEntradaISO}
+        fechaSalidaMaxISO={fechaSalidaISO}
+        disponibilidad={disponibilidadEfectiva}
+        precioUnitarioCentimos={precioUnitarioFrigorificoCentimos}
+        noches={nochesFrigorifico}
+        subtotalCentimos={lineaFrigorifico?.subtotalCentimos ?? 0}
       />
 
       <FormularioCliente
