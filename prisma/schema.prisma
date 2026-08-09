@@ -72,6 +72,8 @@ model LineaConcepto {
   cantidad               Int
   precioUnitarioCentimos Int
   subtotalCentimos       Int
+
+  @@index([reservaId])
 }
 
 model Tarifa {

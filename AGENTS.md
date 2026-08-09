@@ -123,7 +123,11 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
 
 - **Fase 0** ✅ — scaffold Next.js + Prisma (SQLite, adaptador better-sqlite3) + Vitest.
 - **Fase 1** ✅ — schema Prisma completo, migración inicial, seed (100 parcelas + 9 tarifas),
-  `lib/dinero.ts`, `lib/temporada.ts` (+ tests), `agents.md`, subagentes de revisión.
+  `lib/dinero.ts`, `lib/temporada.ts` (+ tests), `agents.md`, subagentes de revisión. Revisada
+  por security-reviewer (sin hallazgos bloqueantes) y performance-optimizer (añadido índice en
+  `LineaConcepto.reservaId`). Pendiente a vigilar en Fase 2: el índice compuesto de `Reserva`
+  lleva `parcelaId` como columna líder — si el endpoint del mapa consulta reservas por rango de
+  fecha sin filtrar por parcela, valorar un índice adicional `(estado, fechaEntrada, fechaSalida)`.
 - **Fase 2** ⏳ — mapa visual de parcelas.
 - **Fase 3** ⏳ — panel de reserva, detalle de parcela, checkout.
 - **Fase 4** ⏳ — validaciones endurecidas + suite de tests completa.
