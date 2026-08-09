@@ -31,11 +31,26 @@ export default async function ParcelaDetallePage({
   const fecha = (fechaParam && parseFechaISO(fechaParam)) || hoy();
   const fechaISO = formatFechaISO(fecha);
 
+  const MAX_HISTORIAL = 50;
+
   const parcela = await prisma.parcela.findUnique({
     where: { numero },
-    include: {
+    select: {
+      id: true,
+      numero: true,
+      tipo: true,
       reservas: {
         orderBy: { fechaEntrada: "desc" },
+        take: MAX_HISTORIAL,
+        select: {
+          id: true,
+          fechaEntrada: true,
+          fechaSalida: true,
+          estado: true,
+          totalCentimos: true,
+          clienteNombre: true,
+          clienteTelefono: true,
+        },
       },
     },
   });
@@ -46,7 +61,7 @@ export default async function ParcelaDetallePage({
 
   const reservaVigente = parcela.reservas.find((reserva) => reservaCubreFecha(reserva, fecha));
   const estado = determinarEstado(Boolean(reservaVigente), fecha);
-  const tarifas = await prisma.tarifa.findMany({ orderBy: { concepto: "asc" } });
+  const tarifas = estado === "LIBRE" ? await prisma.tarifa.findMany({ orderBy: { concepto: "asc" } }) : [];
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-6 py-10">

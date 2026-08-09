@@ -14,10 +14,26 @@ export async function GET(
 
   const parcela = await prisma.parcela.findUnique({
     where: { numero },
-    include: {
+    select: {
+      id: true,
+      numero: true,
+      tipo: true,
+      tieneElectricidad: true,
+      notas: true,
       reservas: {
         orderBy: { fechaEntrada: "desc" },
-        include: { lineas: true },
+        select: {
+          id: true,
+          fechaEntrada: true,
+          fechaSalida: true,
+          temporada: true,
+          estado: true,
+          totalCentimos: true,
+          clienteNombre: true,
+          lineas: {
+            select: { concepto: true, cantidad: true, precioUnitarioCentimos: true, subtotalCentimos: true },
+          },
+        },
       },
     },
   });

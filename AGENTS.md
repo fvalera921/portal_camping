@@ -134,14 +134,21 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
   (añadido índice `Reserva(estado, fechaEntrada, fechaSalida)` para la query del mapa, que no
   usaba el índice existente por no filtrar por `parcelaId`; `ParcelaCelda` y
   `ContadoresOcupacion` memoizados con `React.memo`/`useMemo`).
-- **Fase 3** ⏳ — panel de reserva (`POST /api/reservas`, precios congelados desde `Tarifa`,
+- **Fase 3** ✅ — panel de reserva (`POST /api/reservas`, precios congelados desde `Tarifa`,
   solapamiento verificado dentro de una transacción), detalle de parcela con historial
   (`app/parcelas/[numero]`), checkout/cancelación (`PATCH /api/reservas/[id]`). Verificada
   manualmente end-to-end (crear reserva, solapamiento rechazado con 409, intento de manipular
-  el precio desde el cliente ignorado, checkout libera la parcela). Pendiente: revisión de
-  security-reviewer/performance-optimizer. Nota para Fase 4: la creación envuelve la
-  comprobación de solapamiento y el `create` en `prisma.$transaction`, pero conviene añadir un
-  test de concurrencia real (dos peticiones simultáneas) en la suite de tests.
+  el precio desde el cliente ignorado, checkout libera la parcela).
+  Revisada por security-reviewer (confirmó que la regla de precios congelados es correcta —
+  el precio nunca lo manda el cliente; corregida sobre-exposición de PII en
+  `GET /api/parcelas/[numero]`, que devolvía DNI/teléfono/email/matrícula de todo el
+  histórico sin que ningún consumidor los usara — ahora usa `select` explícito y solo expone
+  `clienteNombre`) y performance-optimizer (confirmó que la resolución de tarifas en
+  `POST /api/reservas` ya usa una sola query `IN`, sin N+1; confirmó que `prisma.$transaction`
+  serializa correctamente la comprobación de solapamiento + creación gracias al mutex del
+  adaptador better-sqlite3 — con la salvedad de que ese mutex es solo intra-proceso, revisar
+  al migrar a Postgres o desplegar multi-proceso; acotado el historial de `app/parcelas/[numero]`
+  con `select`+`take: 50` y evitada la query de tarifas cuando la parcela no está LIBRE).
 - **Fase 4** ⏳ — validaciones endurecidas + suite de tests completa.
 
 <!-- BEGIN:nextjs-agent-rules -->
