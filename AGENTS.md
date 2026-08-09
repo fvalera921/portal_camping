@@ -225,6 +225,14 @@ del historial de reservas si una parcela supera las 50 reservas (`app/parcelas/[
   más corto que la parcela, liberación exacta el día que termina, rechazo de solapamiento (409),
   rechazo de rango fuera de la reserva (400), rechazo de intentar colar `FRIGORIFICO` por el
   array genérico de `lineas` (400).
+  Revisado por security-reviewer (sin hallazgos bloqueantes — confirmó que el precio del
+  frigorífico se resuelve siempre en servidor, que no se puede colar por el array genérico de
+  `lineas`, y que `GET /api/frigorificos` no expone PII) y performance-optimizer (mismo error de
+  índice que en Fase 2, esta vez repetido: `@@index([frigorificoId, ...])` no cubre
+  `GET /api/frigorificos`, que busca solapamientos sin fijar `frigorificoId` — añadido
+  `@@index([estado, frigorificoFechaEntrada, frigorificoFechaSalida])`; señaló también que el
+  fetch de disponibilidad en `PanelReserva.tsx` no tiene debounce, aceptado como no bloqueante
+  con solo 8 frigoríficos).
 
 <!-- BEGIN:nextjs-agent-rules -->
 
