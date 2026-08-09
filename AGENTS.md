@@ -51,6 +51,9 @@ electricidad, mascotas...), cálculo de totales y check-out.
   schema.prisma, migrations/, seed.ts
 /lib/__tests__       → tests de Vitest (precios y solapamientos son prioridad)
 .claude/agents/      → subagentes security-reviewer y performance-optimizer
+.claude/skills/guarda/ → skill "/guarda": guarda el estado del proyecto (AGENTS.md + commit +
+                          push) para poder continuar en otra sesión. Úsala al terminar de
+                          trabajar o como checkpoint a mitad.
 ```
 
 ## Modelo de datos
@@ -303,6 +306,29 @@ Motivo: despliegue en Vercel. SQLite con un fichero local no funciona en funcion
   (100 parcelas, 10 tarifas, 8 frigorificos), 45/45 tests contra schemas de Postgres aislados sin
   dejar residuos, `npm run dev` sirviendo `/` y `/api/parcelas` con datos reales de Supabase,
   build/lint/typecheck limpios.
+
+### Checkpoint de sesión — proyecto listo para desplegar en Vercel
+
+Todo lo del plan original más frigoríficos y la migración a Postgres está commiteado y pusheado
+a `main` en `https://github.com/fvalera921/portal_camping`. Estado al cierre de esta sesión:
+
+- **Bloqueado / pendiente de acción externa** (no es trabajo de código, requiere al usuario):
+  1. **Precio de `FRIGORIFICO`**: sembrado a 0 €/0 € como placeholder. El usuario dijo que tiene
+     coste pero aún no dio la cifra. En cuanto la confirme: actualizar `prisma/seed.ts` (líneas
+     de `TARIFAS`) y volver a correr `npm run db:seed`, o actualizar la fila directamente en
+     Supabase (Table Editor → `Tarifa` → `FRIGORIFICO`).
+  2. **Variables de entorno en Vercel**: hay que añadir `DATABASE_URL` y `DIRECT_URL` en el
+     dashboard de Vercel (Project Settings → Environment Variables) con los mismos valores que
+     el `.env` local (ver sección de migración a Postgres más arriba para el formato exacto y
+     por qué son dos variables). No confirmado si ya se hizo — verificar antes de dar por
+     desplegable el proyecto.
+  3. El primer deploy en Vercel en sí **no se ha probado todavía** — todo lo verificado ha sido
+     en local (`npm run dev`/`npm run build` contra Supabase real). Antes de darlo por bueno en
+     producción, comprobar el primer deploy real.
+- **Próximos pasos ya identificados** (no bloqueantes, ver también "Próximos pasos naturales"
+  más arriba): autenticación real, edición de tarifas desde la UI, rate limiting, botón de
+  cancelar reserva para el estado RESERVADA (hoy solo hay botón de checkout para OCUPADA).
+- Repo, tests (45/45) y build/lint/typecheck: todos en verde en el último commit.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
