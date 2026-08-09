@@ -10,6 +10,9 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // El CLI (migrate/db push) necesita conexion directa, sin pooler (PgBouncer no soporta
+    // bien las sentencias DDL de las migraciones). La app en runtime usa DATABASE_URL
+    // (pooled) via el adaptador en lib/db.ts, no este valor.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });

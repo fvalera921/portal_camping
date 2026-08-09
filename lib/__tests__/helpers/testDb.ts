@@ -1,53 +1,73 @@
-import Database from "better-sqlite3";
-import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { Client } from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/app/generated/prisma/client";
 
 const MIGRATIONS_DIR = path.resolve(process.cwd(), "prisma/migrations");
-const SUFIJOS_SQLITE = ["", "-journal", "-wal", "-shm"];
 
-function borrarFicherosDb(ruta: string): void {
-  for (const sufijo of SUFIJOS_SQLITE) {
-    const archivo = `${ruta}${sufijo}`;
-    if (existsSync(archivo)) rmSync(archivo);
+function urlDeAdministracion(): string {
+  // Session pooler (o conexion directa si se define aparte): soporta bien las sentencias DDL
+  // (CREATE SCHEMA, CREATE TABLE...) y mantiene una conexion de servidor estable por cliente,
+  // a diferencia del Transaction pooler que usa la app en runtime (ver lib/db.ts).
+  const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("Falta DIRECT_URL o DATABASE_URL para los tests de integracion");
   }
+  return url;
+}
+
+async function borrarEsquema(cliente: Client, nombreEsquema: string): Promise<void> {
+  await cliente.query(`DROP SCHEMA IF EXISTS "${nombreEsquema}" CASCADE`);
 }
 
 /**
- * Crea un PrismaClient sobre un fichero SQLite nuevo y aislado, aplicando las migraciones
- * reales del proyecto (mismo schema que producción, sin depender de invocar el CLI de Prisma
- * como subproceso). Cada test file que la use debe pasar un nombre de fichero distinto.
+ * Crea un PrismaClient sobre un schema de Postgres nuevo y aislado (dentro de la misma base de
+ * Supabase), aplicando las migraciones reales del proyecto — igual que en producción, sin
+ * depender de invocar el CLI de Prisma como subproceso. Cada test file que la use debe pasar un
+ * nombre de schema distinto; se borra y se vuelve a crear vacío en cada llamada.
  */
-export function crearClientePrueba(nombreArchivo: string): { prisma: PrismaClient; ruta: string } {
-  if (!/^test-[a-zA-Z0-9_-]+\.db$/.test(nombreArchivo)) {
+export async function crearClientePrueba(
+  nombreEsquema: string,
+): Promise<{ prisma: PrismaClient; nombreEsquema: string }> {
+  if (!/^test_[a-z0-9_]+$/.test(nombreEsquema)) {
     throw new Error(
-      `nombreArchivo invalido para BD de test: "${nombreArchivo}" (debe empezar por "test-" y terminar en ".db")`,
+      `nombreEsquema invalido para BD de test: "${nombreEsquema}" (debe empezar por "test_" y usar solo minusculas/numeros/guion bajo)`,
     );
   }
-  const ruta = path.resolve(process.cwd(), `prisma/${nombreArchivo}`);
-  borrarFicherosDb(ruta);
 
-  const db = new Database(ruta);
+  const urlBase = urlDeAdministracion();
+  const admin = new Client({ connectionString: urlBase });
+  await admin.connect();
   try {
+    await borrarEsquema(admin, nombreEsquema);
+    await admin.query(`CREATE SCHEMA "${nombreEsquema}"`);
+    await admin.query(`SET search_path TO "${nombreEsquema}"`);
+
     const carpetasMigraciones = readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
       .filter((entrada) => entrada.isDirectory())
       .map((entrada) => entrada.name)
       .sort();
     for (const carpeta of carpetasMigraciones) {
       const sql = readFileSync(path.join(MIGRATIONS_DIR, carpeta, "migration.sql"), "utf-8");
-      db.exec(sql);
+      await admin.query(sql);
     }
   } finally {
-    db.close();
+    await admin.end();
   }
 
-  const adapter = new PrismaBetterSqlite3({ url: `file:${ruta.replace(/\\/g, "/")}` });
+  const adapter = new PrismaPg({ connectionString: urlBase }, { schema: nombreEsquema });
   const prisma = new PrismaClient({ adapter });
-  return { prisma, ruta };
+  return { prisma, nombreEsquema };
 }
 
-export async function cerrarClientePrueba(prisma: PrismaClient, ruta: string): Promise<void> {
+export async function cerrarClientePrueba(prisma: PrismaClient, nombreEsquema: string): Promise<void> {
   await prisma.$disconnect();
-  borrarFicherosDb(ruta);
+  const admin = new Client({ connectionString: urlDeAdministracion() });
+  await admin.connect();
+  try {
+    await borrarEsquema(admin, nombreEsquema);
+  } finally {
+    await admin.end();
+  }
 }

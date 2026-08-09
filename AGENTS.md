@@ -11,10 +11,13 @@ electricidad, mascotas...), cálculo de totales y check-out.
 ## Stack
 
 - **Next.js 16** (App Router) + **TypeScript** + **Tailwind CSS**
-- **SQLite** vía **Prisma 7** (con adaptador `@prisma/adapter-better-sqlite3`, requerido en
-  Prisma 7 — ya no basta con poner `url` en `schema.prisma`). Pensado para migrar a Postgres
-  cambiando el `datasource provider`, el adaptador (`@prisma/adapter-pg`) y `DATABASE_URL`.
-- **Vitest** para tests unitarios (`lib/__tests__`)
+- **Postgres** (Supabase) vía **Prisma 7** con adaptador `@prisma/adapter-pg` (requerido en
+  Prisma 7 — ya no basta con poner `url` en `schema.prisma`). Empezó en SQLite/`better-sqlite3`
+  y se migró a Postgres — ver "Cambios posteriores a la Fase 4" para el porqué y los detalles
+  de conexión (pooler vs. conexión directa, IPv6, `sslmode`).
+- **Vitest** para tests unitarios (`lib/__tests__`), incluidos tests de integración contra la
+  base de Supabase real, aislados por *schema* de Postgres (ver
+  `lib/__tests__/helpers/testDb.ts`).
 - Sin autenticación en fase 1. Ver `lib/auth.ts`: expone un `getSession()` stub que siempre
   autoriza. Cuando se añada auth real (NextAuth, Clerk, lo que sea), sustituir esa función y
   envolver las rutas de `/app/api/**/route.ts` con la comprobación — están escritas para
@@ -36,7 +39,7 @@ electricidad, mascotas...), cálculo de totales y check-out.
   generated/prisma/                 → cliente Prisma generado (NO editar a mano, ignorado en git)
 /components                         → componentes de UI (mapa, panel de reserva, etc.)
 /lib
-  db.ts             → singleton de PrismaClient con el adaptador de SQLite
+  db.ts             → singleton de PrismaClient con el adaptador de Postgres (pg)
   dinero.ts         → formatEUR, eurosACentimos — SIEMPRE usar esto, nunca floats a pelo
   temporada.ts      → sugerirTemporada(fechaEntrada, fechaSalida) + esFestivo
   precios.ts        → cálculo de subtotales y totales de una reserva
@@ -117,13 +120,17 @@ electricidad, mascotas...), cálculo de totales y check-out.
 ```bash
 npm run dev          # servidor de desarrollo
 npm run build         # build de producción
-npm run test           # vitest run (una vez)
+npm run test           # vitest run (una vez) — necesita DATABASE_URL/DIRECT_URL en .env
 npm run test:watch      # vitest en modo watch
 npm run lint            # eslint
-npx prisma migrate dev --name <nombre>   # nueva migración
-npm run db:seed           # ejecuta prisma/seed.ts (100 parcelas + 9 tarifas)
+npx prisma migrate dev --name <nombre>   # nueva migración (usa DIRECT_URL)
+npm run db:seed           # ejecuta prisma/seed.ts (100 parcelas, 10 tarifas, 8 frigorificos)
 npm run db:studio          # Prisma Studio para inspeccionar datos
 ```
+
+`.env` necesita `DATABASE_URL` (Transaction pooler, puerto 6543) y `DIRECT_URL` (Session
+pooler, puerto 5432) de Supabase — ver "Cambios posteriores a la Fase 4" para por qué son dos
+variables distintas y qué formato exacto llevan.
 
 ## Qué NO hacer
 
@@ -137,8 +144,11 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
 - No editar nada dentro de `app/generated/prisma/` (se regenera con `prisma generate`).
 - No añadir autenticación real todavía, pero tampoco escribir código que asuma que nunca
   existirá (usa el stub de `lib/auth.ts`).
-- No introducir Postgres-only features en el schema que compliquen la migración futura sin
-  necesidad.
+- No usar `DATABASE_URL` (pooled, Transaction mode) para migraciones — usa `DIRECT_URL`
+  (Session pooler). PgBouncer en modo Transaction no soporta bien las sentencias DDL.
+- No usar la conexión directa de Supabase (`db.<ref>.supabase.co:5432`) — es IPv6-only y no
+  resuelve desde redes solo-IPv4. Usa siempre el Session pooler (mismo host que el Transaction
+  pooler, puerto 5432) para lo que antes hubiera sido "conexión directa".
 - No dejar que el rango de fechas de un frigorifico se salga del rango `[fechaEntrada,
   fechaSalida]` de la reserva a la que pertenece — validar siempre en servidor
   (`app/api/reservas/route.ts`), no confiar solo en los `min`/`max` del `<input type="date">`.
@@ -148,6 +158,7 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
 ## Estado del proyecto (mantener actualizado al final de cada fase)
 
 - **Fase 0** ✅ — scaffold Next.js + Prisma (SQLite, adaptador better-sqlite3) + Vitest.
+  *(Migrado a Postgres/Supabase después de la Fase 4 — ver más abajo.)*
 - **Fase 1** ✅ — schema Prisma completo, migración inicial, seed (100 parcelas + 9 tarifas),
   `lib/dinero.ts`, `lib/temporada.ts` (+ tests), `agents.md`, subagentes de revisión. Revisada
   por security-reviewer (sin hallazgos bloqueantes) y performance-optimizer (añadido índice en
@@ -233,6 +244,65 @@ del historial de reservas si una parcela supera las 50 reservas (`app/parcelas/[
   `@@index([estado, frigorificoFechaEntrada, frigorificoFechaSalida])`; señaló también que el
   fetch de disponibilidad en `PanelReserva.tsx` no tiene debounce, aceptado como no bloqueante
   con solo 8 frigoríficos).
+
+### Migración de SQLite a Postgres (Supabase)
+
+Motivo: despliegue en Vercel. SQLite con un fichero local no funciona en funciones serverless
+(sin disco compartido entre invocaciones/instancias) — ya estaba anticipado en el stack
+("pensado para migrar a Postgres") y se ejecutó al preparar el proyecto para producción.
+
+- `prisma/schema.prisma`: `datasource db { provider = "postgresql" }` (sin `url`, igual que
+  antes con SQLite — Prisma 7 no permite `url` en el schema).
+- `lib/db.ts`: adaptador `@prisma/adapter-pg` (`PrismaPg`) en vez de `PrismaBetterSqlite3`.
+  Lanza si falta `DATABASE_URL` (ya no hay fallback a fichero local).
+- `prisma.config.ts`: `datasource.url` usa `DIRECT_URL` (con fallback a `DATABASE_URL`) — el
+  CLI de Prisma (migraciones) necesita una conexión que soporte DDL bien.
+- **Dos variables de entorno, no una** (Supabase/Supavisor):
+  - `DATABASE_URL` = **Transaction pooler**, puerto `6543`. La usa la app en runtime
+    (`lib/db.ts`). Muchas conexiones cortas concurrentes (típico de serverless) — el modo
+    Transaction es el adecuado.
+  - `DIRECT_URL` = **Session pooler**, puerto `5432`, **mismo host** que el Transaction pooler
+    (`aws-1-eu-west-1.pooler.supabase.com` en este proyecto). La usa solo el CLI de Prisma para
+    migraciones — PgBouncer en modo Transaction no soporta bien las sentencias DDL
+    (`CREATE TABLE`, etc.).
+  - **No uses la "Direct connection" que ofrece el panel de Supabase**
+    (`db.<ref>.supabase.co:5432`): esa es IPv6-only desde ~2024 para proyectos nuevos y no
+    resuelve por DNS en redes solo-IPv4 (`getaddrinfo ENOTFOUND`) — confirmado en este proyecto.
+    El Session pooler (mismo host que el Transaction pooler, puerto 5432) es la alternativa
+    IPv4-compatible que recomienda Supabase para este caso, y es la que se usa aquí.
+  - Las dos URLs llevan `?sslmode=no-verify`: con `sslmode=require` (o sin especificar), el
+    driver `pg` intenta verificar el certificado contra una CA y falla con "self-signed
+    certificate in certificate chain" — el pooler de Supabase presenta un certificado que Node
+    no reconoce. `no-verify` sigue cifrando la conexión, solo no valida la cadena.
+  - Formato exacto usado (sustituir `<password>`):
+    `postgresql://postgres.rxaklignrfhjtkqondbi:<password>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=no-verify`
+    (Transaction, → `DATABASE_URL`) y la misma URL con `:5432` en vez de `:6543` (Session, →
+    `DIRECT_URL`).
+- **Variables de entorno en Vercel** (Project Settings → Environment Variables): añadir
+  `DATABASE_URL` y `DIRECT_URL` con los mismos valores que en `.env` local. Son las dos únicas
+  variables que usa el proyecto — no hay ninguna otra clave/secreto todavía (sin auth real).
+- Migraciones: se borró el historial de migraciones de SQLite (era SQL incompatible) y se generó
+  uno nuevo desde cero contra Postgres (`prisma/migrations/20260809135307_init`), con el schema
+  completo tal como estaba en ese momento (incluye `Frigorifico`). A partir de aquí, migraciones
+  nuevas con `npx prisma migrate dev --name <nombre>` como siempre.
+- **Arnés de tests de integración reescrito** (`lib/__tests__/helpers/testDb.ts`): ya no crea un
+  fichero SQLite por test file — crea/borra un **schema de Postgres aislado** dentro de la misma
+  base de Supabase (`DROP/CREATE SCHEMA`, ejecuta las migraciones reales con `pg.Client`, y el
+  `PrismaClient` de test apunta a ese schema vía la opción `schema` del **segundo** argumento de
+  `PrismaPg` — `new PrismaPg({ connectionString }, { schema: nombreEsquema })`, no vía
+  `search_path` en el connection string ni en las opciones de `pg.Pool`, que no lo aplican en
+  las queries que genera Prisma). Nombres de schema validados contra `/^test_[a-z0-9_]+$/`
+  (mismo motivo que antes con los nombres de fichero: que un uso futuro no pueda apuntar fuera
+  del sandbox de test). Se conecta siempre vía `DIRECT_URL`/Session pooler, nunca por el
+  Transaction pooler, para evitar cualquier duda sobre si el pooler respeta el estado de sesión.
+  Dependencias `better-sqlite3`/`@prisma/adapter-better-sqlite3`/`@types/better-sqlite3`
+  eliminadas de `package.json`, ya no se usan en ningún sitio.
+- `vitest.config.ts` ahora importa `dotenv/config` (Vitest no carga `.env` automáticamente para
+  `process.env`, a diferencia de Next.js).
+- Verificado end-to-end: conectividad de las dos URLs, migración + seed contra Supabase real
+  (100 parcelas, 10 tarifas, 8 frigorificos), 45/45 tests contra schemas de Postgres aislados sin
+  dejar residuos, `npm run dev` sirviendo `/` y `/api/parcelas` con datos reales de Supabase,
+  build/lint/typecheck limpios.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

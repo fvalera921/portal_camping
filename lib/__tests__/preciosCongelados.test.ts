@@ -5,13 +5,13 @@ import type { PrismaClient } from "@/app/generated/prisma/client";
 
 describe("precios congelados en la reserva", () => {
   let prisma: PrismaClient;
-  let ruta: string;
+  let nombreEsquema: string;
   let parcelaId: number;
 
   beforeAll(async () => {
-    const cliente = crearClientePrueba("test-precios-congelados.db");
+    const cliente = await crearClientePrueba("test_precios_congelados");
     prisma = cliente.prisma;
-    ruta = cliente.ruta;
+    nombreEsquema = cliente.nombreEsquema;
     const parcela = await prisma.parcela.create({
       data: { numero: 1, tipo: "TIENDA", tieneElectricidad: false },
     });
@@ -22,7 +22,7 @@ describe("precios congelados en la reserva", () => {
   });
 
   afterAll(async () => {
-    await cerrarClientePrueba(prisma, ruta);
+    await cerrarClientePrueba(prisma, nombreEsquema);
   });
 
   it("una reserva conserva el precio aplicado aunque la tarifa cambie despues de confirmarla", async () => {

@@ -8,15 +8,15 @@ import type { EstadoReserva } from "@/app/generated/prisma/enums";
 
 describe("existeSolapamientoFrigorifico / obtenerDisponibilidadFrigorificos", () => {
   let prisma: PrismaClient;
-  let ruta: string;
+  let nombreEsquema: string;
   let parcelaId: number;
   let frigorificoAId: number;
   let frigorificoBId: number;
 
   beforeAll(async () => {
-    const cliente = crearClientePrueba("test-frigorificos.db");
+    const cliente = await crearClientePrueba("test_frigorificos");
     prisma = cliente.prisma;
-    ruta = cliente.ruta;
+    nombreEsquema = cliente.nombreEsquema;
     const parcela = await prisma.parcela.create({
       data: { numero: 1, tipo: "TIENDA", tieneElectricidad: false },
     });
@@ -28,7 +28,7 @@ describe("existeSolapamientoFrigorifico / obtenerDisponibilidadFrigorificos", ()
   });
 
   afterAll(async () => {
-    await cerrarClientePrueba(prisma, ruta);
+    await cerrarClientePrueba(prisma, nombreEsquema);
   });
 
   beforeEach(async () => {

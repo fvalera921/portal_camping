@@ -7,13 +7,13 @@ import type { EstadoReserva } from "@/app/generated/prisma/enums";
 
 describe("existeSolapamiento", () => {
   let prisma: PrismaClient;
-  let ruta: string;
+  let nombreEsquema: string;
   let parcelaId: number;
 
   beforeAll(async () => {
-    const cliente = crearClientePrueba("test-solapamiento.db");
+    const cliente = await crearClientePrueba("test_solapamiento");
     prisma = cliente.prisma;
-    ruta = cliente.ruta;
+    nombreEsquema = cliente.nombreEsquema;
     const parcela = await prisma.parcela.create({
       data: { numero: 1, tipo: "TIENDA", tieneElectricidad: false },
     });
@@ -21,7 +21,7 @@ describe("existeSolapamiento", () => {
   });
 
   afterAll(async () => {
-    await cerrarClientePrueba(prisma, ruta);
+    await cerrarClientePrueba(prisma, nombreEsquema);
   });
 
   beforeEach(async () => {
