@@ -1,4 +1,5 @@
 import { memo } from "react";
+import Link from "next/link";
 import type { ParcelaConEstado, EstadoParcela } from "@/lib/estadoParcela";
 import type { TipoParcela } from "@/app/generated/prisma/enums";
 
@@ -41,18 +42,18 @@ const ETIQUETA_TIPO: Record<TipoParcela, string> = {
   AUTOCARAVANA: "Autocaravana",
 };
 
-function ParcelaCelda({ parcela }: { parcela: ParcelaConEstado }) {
+function ParcelaCelda({ parcela, fechaISO }: { parcela: ParcelaConEstado; fechaISO: string }) {
   const estilo = ESTILO_ESTADO[parcela.estado];
   const descripcion = `Parcela ${parcela.numero}, ${ETIQUETA_TIPO[parcela.tipo]}${
     parcela.tieneElectricidad ? ", con electricidad" : ""
   }, estado: ${estilo.etiqueta}`;
 
   return (
-    <div
-      role="img"
-      aria-label={descripcion}
+    <Link
+      href={`/parcelas/${parcela.numero}?fecha=${fechaISO}`}
+      aria-label={`${descripcion}. Ver detalle.`}
       title={descripcion}
-      className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border-2 p-1 text-center ${estilo.fondo} ${estilo.borde} ${estilo.texto}`}
+      className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border-2 p-1 text-center transition hover:brightness-95 ${estilo.fondo} ${estilo.borde} ${estilo.texto}`}
     >
       <span className="text-xs font-bold">{parcela.numero}</span>
       <span aria-hidden="true" className="text-base leading-none">
@@ -67,7 +68,7 @@ function ParcelaCelda({ parcela }: { parcela: ParcelaConEstado }) {
         </span>
       )}
       <span className="text-[9px] leading-none font-medium">{estilo.etiqueta}</span>
-    </div>
+    </Link>
   );
 }
 

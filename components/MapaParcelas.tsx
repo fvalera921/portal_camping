@@ -62,7 +62,7 @@ export default function MapaParcelas({
 
       <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
         {parcelasFiltradas.map((parcela) => (
-          <ParcelaCelda key={parcela.id} parcela={parcela} />
+          <ParcelaCelda key={parcela.id} parcela={parcela} fechaISO={fechaISO} />
         ))}
       </div>
     </div>

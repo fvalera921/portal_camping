@@ -13,6 +13,23 @@ export type ParcelaConEstado = {
   estado: EstadoParcela;
 };
 
+const ESTADOS_ACTIVOS = new Set(["CONFIRMADA", "EN_CURSO"]);
+
+export function reservaCubreFecha(
+  reserva: { fechaEntrada: Date; fechaSalida: Date; estado: string },
+  fecha: Date,
+): boolean {
+  if (!ESTADOS_ACTIVOS.has(reserva.estado)) return false;
+  const dia = inicioDia(fecha);
+  return reserva.fechaEntrada <= dia && dia < reserva.fechaSalida;
+}
+
+/** LIBRE si no hay reserva activa cubriendo la fecha; si la hay, OCUPADA (fecha <= hoy) o RESERVADA (fecha futura). */
+export function determinarEstado(cubiertaPorReserva: boolean, fecha: Date): EstadoParcela {
+  if (!cubiertaPorReserva) return "LIBRE";
+  return inicioDia(fecha) > hoy() ? "RESERVADA" : "OCUPADA";
+}
+
 /**
  * Calcula el estado de las 100 parcelas para una fecha dada con un número constante de
  * queries (2), no una por parcela: una para las parcelas y otra para las reservas que
@@ -36,14 +53,9 @@ export async function obtenerParcelasConEstado(fecha: Date): Promise<ParcelaConE
   ]);
 
   const parcelasConReserva = new Set(reservasDelDia.map((r) => r.parcelaId));
-  const esFuturo = dia > hoy();
 
   return parcelas.map((parcela) => ({
     ...parcela,
-    estado: parcelasConReserva.has(parcela.id)
-      ? esFuturo
-        ? "RESERVADA"
-        : "OCUPADA"
-      : "LIBRE",
+    estado: determinarEstado(parcelasConReserva.has(parcela.id), fecha),
   }));
 }
