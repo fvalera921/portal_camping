@@ -90,6 +90,11 @@ electricidad, mascotas...), cálculo de totales y check-out.
 - Los helpers de `lib/` son funciones puras cuando es posible, para poder testearlas sin DB.
 - Todas las mutaciones de datos pasan por las rutas de `app/api/**`, nunca por Server Actions
   que salten la validación de solapamiento.
+- Fechas de negocio (`fechaEntrada`, `fechaSalida`, fecha del mapa...) siempre se construyen con
+  `parseFechaISO`/`inicioDia` de `lib/fechas.ts`, nunca con `new Date(stringISO)`: la forma
+  "solo fecha" de `new Date()` se interpreta como medianoche UTC, no local, y puede desplazar
+  el día según la zona horaria — un bug real que apareció en `lib/__tests__/solapamiento.test.ts`
+  por mezclar ambas formas.
 
 ## Comandos
 
@@ -149,7 +154,17 @@ npm run db:studio          # Prisma Studio para inspeccionar datos
   adaptador better-sqlite3 — con la salvedad de que ese mutex es solo intra-proceso, revisar
   al migrar a Postgres o desplegar multi-proceso; acotado el historial de `app/parcelas/[numero]`
   con `select`+`take: 50` y evitada la query de tarifas cuando la parcela no está LIBRE).
-- **Fase 4** ⏳ — validaciones endurecidas + suite de tests completa.
+- **Fase 4** ⏳ — suite de tests completa (36 tests): `lib/__tests__/precios.test.ts` (cálculo
+  de subtotales/totales), `lib/__tests__/solapamiento.test.ts` (integración contra una BD
+  SQLite real y aislada por test file — ver `lib/__tests__/helpers/testDb.ts`, que aplica las
+  migraciones reales del proyecto; cubre solapamiento total/parcial/contenido, contiguas en
+  ambos sentidos, `CANCELADA`/`FINALIZADA` no bloquean, `EN_CURSO` sí bloquea, aislamiento entre
+  parcelas), `lib/__tests__/preciosCongelados.test.ts` (una reserva conserva su precio aunque
+  `Tarifa` cambie después). Durante esta fase el propio test de "contiguas" detectó un bug —
+  en el *test*, no en la app: construir fechas con `new Date("2026-01-05")` (interpretado como
+  medianoche UTC) en vez de `parseFechaISO`/construcción por componentes (medianoche local) da
+  fechas distintas y falseaba el resultado. Confirma por qué `AGENTS.md` insiste en no usar
+  `new Date(string)` para fechas de negocio en ningún sitio del proyecto, tests incluidos.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

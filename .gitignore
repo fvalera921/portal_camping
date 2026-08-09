@@ -43,5 +43,6 @@ next-env.d.ts
 # database
 /*.db
 /*.db-journal
+prisma/test-*.db*
 
 /app/generated/prisma
