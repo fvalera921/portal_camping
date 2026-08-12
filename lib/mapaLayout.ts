@@ -42,6 +42,8 @@ export function generarLayoutMapa(): PosicionCelda[] {
   return celdas;
 }
 
+// minmax con un minimo (no 0) para que las celdas nunca se compriman por debajo de un tamano
+// tocable en movil; si no caben todas, el contenedor hace scroll horizontal (ver MapaParcelas).
 export const GRID_TEMPLATE_COLUMNAS = Array.from({ length: NUM_COLUMNAS_GRID }, (_, i) =>
-  COLUMNA_GRID.includes(i + 1) ? "minmax(0,1fr)" : "0.75rem",
+  COLUMNA_GRID.includes(i + 1) ? "minmax(2.75rem,1fr)" : "0.75rem",
 ).join(" ");

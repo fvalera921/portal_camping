@@ -75,20 +75,22 @@ export default function MapaParcelas({
         Mostrando {parcelasFiltradas.length} de {parcelas.length} parcelas
       </p>
 
-      <div className="grid gap-2" style={{ gridTemplateColumns: GRID_TEMPLATE_COLUMNAS }}>
-        {LAYOUT_MAPA.map(({ numero, fila, columnaGrid }) => {
-          const parcela = parcelaPorNumero.get(numero);
-          if (!parcela) return null;
-          return (
-            <div
-              key={numero}
-              style={{ gridRow: fila, gridColumn: columnaGrid }}
-              className={numerosVisibles.has(numero) ? undefined : "invisible"}
-            >
-              <ParcelaCelda parcela={parcela} fechaISO={fechaISO} />
-            </div>
-          );
-        })}
+      <div className="overflow-x-auto">
+        <div className="grid gap-2" style={{ gridTemplateColumns: GRID_TEMPLATE_COLUMNAS }}>
+          {LAYOUT_MAPA.map(({ numero, fila, columnaGrid }) => {
+            const parcela = parcelaPorNumero.get(numero);
+            if (!parcela) return null;
+            return (
+              <div
+                key={numero}
+                style={{ gridRow: fila, gridColumn: columnaGrid }}
+                className={numerosVisibles.has(numero) ? undefined : "invisible"}
+              >
+                <ParcelaCelda parcela={parcela} fechaISO={fechaISO} />
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -51,37 +51,39 @@ export default function ListaConceptos({
         return (
           <div
             key={tarifa.concepto}
-            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+            className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
           >
             <div>
               <p className="text-sm font-medium text-neutral-900">{etiqueta}</p>
               <p className="text-xs text-neutral-500">{formatEUR(precioUnitarioCentimos)} / día</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label={`Quitar ${etiqueta}`}
-                onClick={() => onCambiarCantidad(tarifa.concepto, Math.max(cantidad - 1, 0))}
-                disabled={cantidad === 0}
-                className="h-7 w-7 rounded-md border border-neutral-300 text-neutral-700 disabled:opacity-40"
-              >
-                −
-              </button>
-              <span className="w-6 text-center text-sm" aria-live="polite">
-                {cantidad}
-              </span>
-              <button
-                type="button"
-                aria-label={`Añadir ${etiqueta}`}
-                onClick={() => onCambiarCantidad(tarifa.concepto, cantidad + 1)}
-                className="h-7 w-7 rounded-md border border-neutral-300 text-neutral-700"
-              >
-                +
-              </button>
+            <div className="flex items-center justify-between gap-2 sm:justify-end">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label={`Quitar ${etiqueta}`}
+                  onClick={() => onCambiarCantidad(tarifa.concepto, Math.max(cantidad - 1, 0))}
+                  disabled={cantidad === 0}
+                  className="h-7 w-7 rounded-md border border-neutral-300 text-neutral-700 disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span className="w-6 text-center text-sm" aria-live="polite">
+                  {cantidad}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Añadir ${etiqueta}`}
+                  onClick={() => onCambiarCantidad(tarifa.concepto, cantidad + 1)}
+                  className="h-7 w-7 rounded-md border border-neutral-300 text-neutral-700"
+                >
+                  +
+                </button>
+              </div>
+              <p className="w-24 text-right text-sm font-semibold text-neutral-900">
+                {cantidad > 0 ? formatEUR(subtotalCentimos) : "—"}
+              </p>
             </div>
-            <p className="w-24 text-right text-sm font-semibold text-neutral-900">
-              {cantidad > 0 ? formatEUR(subtotalCentimos) : "—"}
-            </p>
           </div>
         );
       })}
