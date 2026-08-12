@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ParcelaConEstado, EstadoParcela } from "@/lib/estadoParcela";
 import type { TipoParcela } from "@/app/generated/prisma/enums";
 import { formatFechaCorta } from "@/lib/fechas";
+import { formatEUR } from "@/lib/dinero";
 
 const ESTILO_ESTADO: Record<
   EstadoParcela,
@@ -36,23 +37,48 @@ const ETIQUETA_TIPO: Record<TipoParcela, string> = {
 
 function ParcelaCelda({ parcela, fechaISO }: { parcela: ParcelaConEstado; fechaISO: string }) {
   const estilo = ESTILO_ESTADO[parcela.estado];
-  const tieneFechas = parcela.reservaFechaEntrada !== null && parcela.reservaFechaSalida !== null;
-  const rangoFechas = tieneFechas
-    ? `${formatFechaCorta(parcela.reservaFechaEntrada!)}–${formatFechaCorta(parcela.reservaFechaSalida!)}`
+  const reserva = parcela.reserva;
+  const rangoFechas = reserva
+    ? `${formatFechaCorta(reserva.fechaEntrada)}–${formatFechaCorta(reserva.fechaSalida)}`
     : null;
-  const descripcion = `Parcela ${parcela.numero}, ${ETIQUETA_TIPO[parcela.tipo]}${
+
+  const aviso = `Parcela ${parcela.numero}, ${ETIQUETA_TIPO[parcela.tipo]}${
     parcela.tieneElectricidad ? ", con electricidad" : ""
-  }, estado: ${estilo.etiqueta}${rangoFechas ? `, del ${rangoFechas}` : ""}`;
+  }, estado: ${estilo.etiqueta}${rangoFechas ? `, del ${rangoFechas}` : ""}. Ver detalle.`;
+
+  const lineasInfo = [
+    `Parcela ${parcela.numero} · ${ETIQUETA_TIPO[parcela.tipo]}${
+      parcela.tieneElectricidad ? " · con electricidad" : ""
+    }`,
+    `Estado: ${estilo.etiqueta}`,
+  ];
+  if (reserva) {
+    lineasInfo.push(
+      `Cliente: ${reserva.clienteNombre}`,
+      `Documento: ${reserva.clienteDocumento}`,
+      `Teléfono: ${reserva.clienteTelefono}`,
+      ...(reserva.clienteEmail ? [`Email: ${reserva.clienteEmail}`] : []),
+      ...(reserva.matricula ? [`Matrícula: ${reserva.matricula}`] : []),
+      `Fechas: ${formatFechaCorta(reserva.fechaEntrada)} - ${formatFechaCorta(reserva.fechaSalida)}`,
+      `Temporada: ${reserva.temporada}`,
+      `Total: ${formatEUR(reserva.totalCentimos)}`,
+    );
+    if (reserva.frigorifico) {
+      lineasInfo.push(
+        `Frigorífico: nº${reserva.frigorifico.numero} (${formatFechaCorta(reserva.frigorifico.fechaEntrada)} - ${formatFechaCorta(reserva.frigorifico.fechaSalida)})`,
+      );
+    }
+  }
 
   return (
     <Link
       href={`/parcelas/${parcela.numero}?fecha=${fechaISO}`}
-      aria-label={`${descripcion}. Ver detalle.`}
-      title={descripcion}
+      aria-label={aviso}
+      title={lineasInfo.join("\n")}
       className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border-2 p-1 text-center transition hover:brightness-95 ${estilo.fondo} ${estilo.borde} ${estilo.texto}`}
     >
       <span className="text-sm font-bold">{parcela.numero}</span>
-      {rangoFechas && <span className="text-[8px] leading-none">{rangoFechas}</span>}
+      {rangoFechas && <span className="text-xs font-medium leading-none">{rangoFechas}</span>}
     </Link>
   );
 }

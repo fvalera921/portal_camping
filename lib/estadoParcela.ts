@@ -1,8 +1,22 @@
 import { prisma } from "@/lib/db";
 import { hoy, inicioDia } from "@/lib/fechas";
-import type { TipoParcela } from "@/app/generated/prisma/enums";
+import type { TipoParcela, Temporada } from "@/app/generated/prisma/enums";
 
 export type EstadoParcela = "LIBRE" | "OCUPADA" | "RESERVADA";
+
+export type ReservaActivaResumen = {
+  id: number;
+  fechaEntrada: Date;
+  fechaSalida: Date;
+  temporada: Temporada;
+  clienteNombre: string;
+  clienteDocumento: string;
+  clienteTelefono: string;
+  clienteEmail: string | null;
+  matricula: string | null;
+  totalCentimos: number;
+  frigorifico: { numero: number; fechaEntrada: Date; fechaSalida: Date } | null;
+};
 
 export type ParcelaConEstado = {
   id: number;
@@ -11,8 +25,7 @@ export type ParcelaConEstado = {
   tieneElectricidad: boolean;
   notas: string | null;
   estado: EstadoParcela;
-  reservaFechaEntrada: Date | null;
-  reservaFechaSalida: Date | null;
+  reserva: ReservaActivaResumen | null;
 };
 
 const ESTADOS_ACTIVOS = new Set(["CONFIRMADA", "EN_CURSO"]);
@@ -50,7 +63,22 @@ export async function obtenerParcelasConEstado(fecha: Date): Promise<ParcelaConE
         fechaEntrada: { lt: diaSiguiente },
         fechaSalida: { gt: dia },
       },
-      select: { parcelaId: true, fechaEntrada: true, fechaSalida: true },
+      select: {
+        id: true,
+        parcelaId: true,
+        fechaEntrada: true,
+        fechaSalida: true,
+        temporada: true,
+        clienteNombre: true,
+        clienteDocumento: true,
+        clienteTelefono: true,
+        clienteEmail: true,
+        matricula: true,
+        totalCentimos: true,
+        frigorificoFechaEntrada: true,
+        frigorificoFechaSalida: true,
+        frigorifico: { select: { numero: true } },
+      },
     }),
   ]);
 
@@ -63,8 +91,28 @@ export async function obtenerParcelasConEstado(fecha: Date): Promise<ParcelaConE
     return {
       ...parcela,
       estado: determinarEstado(reserva !== undefined, fecha),
-      reservaFechaEntrada: reserva?.fechaEntrada ?? null,
-      reservaFechaSalida: reserva?.fechaSalida ?? null,
+      reserva: reserva
+        ? {
+            id: reserva.id,
+            fechaEntrada: reserva.fechaEntrada,
+            fechaSalida: reserva.fechaSalida,
+            temporada: reserva.temporada,
+            clienteNombre: reserva.clienteNombre,
+            clienteDocumento: reserva.clienteDocumento,
+            clienteTelefono: reserva.clienteTelefono,
+            clienteEmail: reserva.clienteEmail,
+            matricula: reserva.matricula,
+            totalCentimos: reserva.totalCentimos,
+            frigorifico:
+              reserva.frigorifico && reserva.frigorificoFechaEntrada && reserva.frigorificoFechaSalida
+                ? {
+                    numero: reserva.frigorifico.numero,
+                    fechaEntrada: reserva.frigorificoFechaEntrada,
+                    fechaSalida: reserva.frigorificoFechaSalida,
+                  }
+                : null,
+          }
+        : null,
     };
   });
 }
