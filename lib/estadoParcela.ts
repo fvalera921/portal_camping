@@ -11,6 +11,8 @@ export type ParcelaConEstado = {
   tieneElectricidad: boolean;
   notas: string | null;
   estado: EstadoParcela;
+  reservaFechaEntrada: Date | null;
+  reservaFechaSalida: Date | null;
 };
 
 const ESTADOS_ACTIVOS = new Set(["CONFIRMADA", "EN_CURSO"]);
@@ -48,14 +50,21 @@ export async function obtenerParcelasConEstado(fecha: Date): Promise<ParcelaConE
         fechaEntrada: { lt: diaSiguiente },
         fechaSalida: { gt: dia },
       },
-      select: { parcelaId: true },
+      select: { parcelaId: true, fechaEntrada: true, fechaSalida: true },
     }),
   ]);
 
-  const parcelasConReserva = new Set(reservasDelDia.map((r) => r.parcelaId));
+  const reservaPorParcela = new Map(
+    reservasDelDia.map((r) => [r.parcelaId, r] as const),
+  );
 
-  return parcelas.map((parcela) => ({
-    ...parcela,
-    estado: determinarEstado(parcelasConReserva.has(parcela.id), fecha),
-  }));
+  return parcelas.map((parcela) => {
+    const reserva = reservaPorParcela.get(parcela.id);
+    return {
+      ...parcela,
+      estado: determinarEstado(reserva !== undefined, fecha),
+      reservaFechaEntrada: reserva?.fechaEntrada ?? null,
+      reservaFechaSalida: reserva?.fechaSalida ?? null,
+    };
+  });
 }

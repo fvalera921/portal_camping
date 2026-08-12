@@ -11,6 +11,9 @@ import FiltrosMapa, {
 } from "@/components/FiltrosMapa";
 import SelectorFechaMapa from "@/components/SelectorFechaMapa";
 import ParcelaCelda from "@/components/ParcelaCelda";
+import { GRID_TEMPLATE_COLUMNAS, generarLayoutMapa } from "@/lib/mapaLayout";
+
+const LAYOUT_MAPA = generarLayoutMapa();
 
 export default function MapaParcelas({
   parcelas,
@@ -34,6 +37,12 @@ export default function MapaParcelas({
         return true;
       }),
     [parcelas, filtroEstado, filtroTipo, filtroElectricidad],
+  );
+
+  const parcelaPorNumero = useMemo(() => new Map(parcelas.map((p) => [p.numero, p])), [parcelas]);
+  const numerosVisibles = useMemo(
+    () => new Set(parcelasFiltradas.map((p) => p.numero)),
+    [parcelasFiltradas],
   );
 
   function cambiarFecha(nuevaFechaISO: string) {
@@ -60,10 +69,20 @@ export default function MapaParcelas({
         Mostrando {parcelasFiltradas.length} de {parcelas.length} parcelas
       </p>
 
-      <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10">
-        {parcelasFiltradas.map((parcela) => (
-          <ParcelaCelda key={parcela.id} parcela={parcela} fechaISO={fechaISO} />
-        ))}
+      <div className="grid gap-2" style={{ gridTemplateColumns: GRID_TEMPLATE_COLUMNAS }}>
+        {LAYOUT_MAPA.map(({ numero, fila, columnaGrid }) => {
+          const parcela = parcelaPorNumero.get(numero);
+          if (!parcela) return null;
+          return (
+            <div
+              key={numero}
+              style={{ gridRow: fila, gridColumn: columnaGrid }}
+              className={numerosVisibles.has(numero) ? undefined : "invisible"}
+            >
+              <ParcelaCelda parcela={parcela} fechaISO={fechaISO} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -28,6 +28,12 @@ export function formatFechaISO(fecha: Date): string {
   return `${anio}-${mes}-${dia}`;
 }
 
+export function formatFechaCorta(fecha: Date): string {
+  const mes = String(fecha.getMonth() + 1).padStart(2, "0");
+  const dia = String(fecha.getDate()).padStart(2, "0");
+  return `${dia}/${mes}`;
+}
+
 export function diferenciaEnNoches(fechaEntrada: Date, fechaSalida: Date): number {
   const msPorDia = 24 * 60 * 60 * 1000;
   return Math.round(

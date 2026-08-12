@@ -2,6 +2,7 @@ import { memo } from "react";
 import Link from "next/link";
 import type { ParcelaConEstado, EstadoParcela } from "@/lib/estadoParcela";
 import type { TipoParcela } from "@/app/generated/prisma/enums";
+import { formatFechaCorta } from "@/lib/fechas";
 
 const ESTILO_ESTADO: Record<
   EstadoParcela,
@@ -35,9 +36,13 @@ const ETIQUETA_TIPO: Record<TipoParcela, string> = {
 
 function ParcelaCelda({ parcela, fechaISO }: { parcela: ParcelaConEstado; fechaISO: string }) {
   const estilo = ESTILO_ESTADO[parcela.estado];
+  const tieneFechas = parcela.reservaFechaEntrada !== null && parcela.reservaFechaSalida !== null;
+  const rangoFechas = tieneFechas
+    ? `${formatFechaCorta(parcela.reservaFechaEntrada!)}–${formatFechaCorta(parcela.reservaFechaSalida!)}`
+    : null;
   const descripcion = `Parcela ${parcela.numero}, ${ETIQUETA_TIPO[parcela.tipo]}${
     parcela.tieneElectricidad ? ", con electricidad" : ""
-  }, estado: ${estilo.etiqueta}`;
+  }, estado: ${estilo.etiqueta}${rangoFechas ? `, del ${rangoFechas}` : ""}`;
 
   return (
     <Link
@@ -47,6 +52,7 @@ function ParcelaCelda({ parcela, fechaISO }: { parcela: ParcelaConEstado; fechaI
       className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border-2 p-1 text-center transition hover:brightness-95 ${estilo.fondo} ${estilo.borde} ${estilo.texto}`}
     >
       <span className="text-sm font-bold">{parcela.numero}</span>
+      {rangoFechas && <span className="text-[8px] leading-none">{rangoFechas}</span>}
     </Link>
   );
 }
