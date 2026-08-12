@@ -26,6 +26,17 @@ export type ReservaTimelineDTO = {
   totalCentimos: number;
 };
 
+export type FrigorificoTimeline = { id: number; numero: number };
+
+export type AsignacionFrigorificoTimelineDTO = {
+  id: number;
+  frigorificoId: number;
+  fechaEntradaISO: string;
+  fechaSalidaISO: string;
+  clienteNombre: string;
+  parcelaNumero: number;
+};
+
 const ANCHO_COLUMNA_ETIQUETA = "5rem";
 const ANCHO_COLUMNA_DIA = "minmax(2.75rem, 1fr)";
 const ALTO_FILA = "2rem";
@@ -33,11 +44,15 @@ const ALTO_FILA = "2rem";
 export default function HistoricoGantt({
   parcelas,
   reservas,
+  frigorificos,
+  asignacionesFrigorifico,
   desdeISO,
   diasVisibles,
 }: {
   parcelas: ParcelaTimeline[];
   reservas: ReservaTimelineDTO[];
+  frigorificos: FrigorificoTimeline[];
+  asignacionesFrigorifico: AsignacionFrigorificoTimelineDTO[];
   desdeISO: string;
   diasVisibles: number;
 }) {
@@ -59,8 +74,20 @@ export default function HistoricoGantt({
     return mapa;
   }, [reservas]);
 
+  const asignacionesPorFrigorifico = useMemo(() => {
+    const mapa = new Map<number, AsignacionFrigorificoTimelineDTO[]>();
+    for (const asignacion of asignacionesFrigorifico) {
+      const lista = mapa.get(asignacion.frigorificoId) ?? [];
+      lista.push(asignacion);
+      mapa.set(asignacion.frigorificoId, lista);
+    }
+    return mapa;
+  }, [asignacionesFrigorifico]);
+
   const columnaHoy = diferenciaEnNoches(desde, hoy());
-  const totalFilas = parcelas.length + 1;
+  const filaDivisor = parcelas.length + 2;
+  const filaFrigorificosInicio = filaDivisor + 1;
+  const totalFilas = filaFrigorificosInicio + frigorificos.length - 1;
 
   function ir(fechaISO: string) {
     router.push(`/historico?desde=${fechaISO}`);
@@ -129,6 +156,14 @@ export default function HistoricoGantt({
             />
           ))}
 
+          {frigorificos.map((frigorifico, indice) => (
+            <div
+              key={frigorifico.id}
+              className={indice % 2 === 0 ? "bg-white" : "bg-neutral-50"}
+              style={{ gridColumn: `1 / -1`, gridRow: filaFrigorificosInicio + indice }}
+            />
+          ))}
+
           {columnaHoy >= 0 && columnaHoy < diasVisibles && (
             <div
               className="bg-blue-100/60"
@@ -143,6 +178,13 @@ export default function HistoricoGantt({
               style={{ gridColumn: i + 2, gridRow: `1 / ${totalFilas + 1}` }}
             />
           ))}
+
+          <div
+            className="flex items-center border-y border-neutral-300 bg-neutral-100 px-2 text-xs font-semibold text-neutral-600"
+            style={{ gridColumn: "1 / -1", gridRow: filaDivisor }}
+          >
+            Frigoríficos
+          </div>
 
           {parcelas.map((parcela, indice) => (
             <Link
@@ -183,6 +225,49 @@ export default function HistoricoGantt({
                 >
                   {reserva.clienteNombre}
                 </div>
+              );
+            });
+          })}
+
+          {frigorificos.map((frigorifico, indice) => (
+            <div
+              key={frigorifico.id}
+              className={`sticky left-0 z-10 flex items-center border-r border-b border-neutral-200 px-2 text-sm font-medium text-neutral-800 ${
+                indice % 2 === 0 ? "bg-white" : "bg-neutral-50"
+              }`}
+              style={{ gridColumn: 1, gridRow: filaFrigorificosInicio + indice }}
+            >
+              F{frigorifico.numero}
+            </div>
+          ))}
+
+          {frigorificos.map((frigorifico, indice) => {
+            const fila = filaFrigorificosInicio + indice;
+            const asignaciones = asignacionesPorFrigorifico.get(frigorifico.id) ?? [];
+            return asignaciones.map((asignacion) => {
+              const entrada = parseFechaISO(asignacion.fechaEntradaISO)!;
+              const salida = parseFechaISO(asignacion.fechaSalidaISO)!;
+              const inicioCol = Math.max(0, diferenciaEnNoches(desde, entrada));
+              const finCol = Math.min(diasVisibles, diferenciaEnNoches(desde, salida));
+              if (finCol <= inicioCol) return null;
+
+              const esFutura = entrada > hoy();
+              const titulo = `${asignacion.clienteNombre} (parcela ${asignacion.parcelaNumero}) · ${formatFechaCorta(
+                entrada,
+              )} - ${formatFechaCorta(salida)}`;
+
+              return (
+                <Link
+                  key={asignacion.id}
+                  href={`/parcelas/${asignacion.parcelaNumero}`}
+                  title={titulo}
+                  className={`m-0.5 flex items-center truncate rounded px-1.5 text-xs font-medium ${
+                    esFutura ? "bg-amber-400 text-amber-950" : "bg-sky-500 text-white"
+                  }`}
+                  style={{ gridColumn: `${inicioCol + 2} / ${finCol + 2}`, gridRow: fila }}
+                >
+                  {asignacion.clienteNombre} · Parc. {asignacion.parcelaNumero}
+                </Link>
               );
             });
           })}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { obtenerReservasEnRango } from "@/lib/timeline";
+import { obtenerAsignacionesFrigorificoEnRango, obtenerReservasEnRango } from "@/lib/timeline";
 import { formatFechaISO, hoy, parseFechaISO, sumarDias } from "@/lib/fechas";
 import HistoricoGantt from "@/components/HistoricoGantt";
 
@@ -15,12 +15,14 @@ export default async function HistoricoPage({
   const desde = (desdeParam && parseFechaISO(desdeParam)) || hoy();
   const hasta = sumarDias(desde, DIAS_VISIBLES);
 
-  const [parcelas, reservas] = await Promise.all([
+  const [parcelas, reservas, frigorificos, asignacionesFrigorifico] = await Promise.all([
     prisma.parcela.findMany({
       orderBy: { numero: "asc" },
       select: { id: true, numero: true, tipo: true },
     }),
     obtenerReservasEnRango(desde, hasta),
+    prisma.frigorifico.findMany({ orderBy: { numero: "asc" }, select: { id: true, numero: true } }),
+    obtenerAsignacionesFrigorificoEnRango(desde, hasta),
   ]);
 
   return (
@@ -40,6 +42,15 @@ export default async function HistoricoPage({
           fechaSalidaISO: formatFechaISO(reserva.fechaSalida),
           clienteNombre: reserva.clienteNombre,
           totalCentimos: reserva.totalCentimos,
+        }))}
+        frigorificos={frigorificos}
+        asignacionesFrigorifico={asignacionesFrigorifico.map((asignacion) => ({
+          id: asignacion.id,
+          frigorificoId: asignacion.frigorificoId,
+          fechaEntradaISO: formatFechaISO(asignacion.fechaEntrada),
+          fechaSalidaISO: formatFechaISO(asignacion.fechaSalida),
+          clienteNombre: asignacion.clienteNombre,
+          parcelaNumero: asignacion.parcelaNumero,
         }))}
         desdeISO={formatFechaISO(desde)}
         diasVisibles={DIAS_VISIBLES}
