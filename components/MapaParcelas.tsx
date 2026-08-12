@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ParcelaConEstado } from "@/lib/estadoParcela";
+import type { FrigorificoConEstado } from "@/lib/frigorificos";
 import ContadoresOcupacion from "@/components/ContadoresOcupacion";
 import FiltrosMapa, {
   type FiltroElectricidad,
@@ -11,15 +12,18 @@ import FiltrosMapa, {
 } from "@/components/FiltrosMapa";
 import SelectorFechaMapa from "@/components/SelectorFechaMapa";
 import ParcelaCelda from "@/components/ParcelaCelda";
+import PanelFrigorificos from "@/components/PanelFrigorificos";
 import { GRID_TEMPLATE_COLUMNAS, generarLayoutMapa } from "@/lib/mapaLayout";
 
 const LAYOUT_MAPA = generarLayoutMapa();
 
 export default function MapaParcelas({
   parcelas,
+  frigorificos,
   fechaISO,
 }: {
   parcelas: ParcelaConEstado[];
+  frigorificos: FrigorificoConEstado[];
   fechaISO: string;
 }) {
   const router = useRouter();
@@ -55,6 +59,8 @@ export default function MapaParcelas({
         <SelectorFechaMapa fechaISO={fechaISO} onCambiar={cambiarFecha} />
         <ContadoresOcupacion parcelas={parcelas} />
       </div>
+
+      <PanelFrigorificos frigorificos={frigorificos} fechaISO={fechaISO} />
 
       <FiltrosMapa
         filtroEstado={filtroEstado}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MapaParcelas from "@/components/MapaParcelas";
 import { obtenerParcelasConEstado } from "@/lib/estadoParcela";
+import { obtenerEstadoFrigorificosEnFecha } from "@/lib/frigorificos";
 import { formatFechaISO, hoy, parseFechaISO } from "@/lib/fechas";
 
 export default async function Home({
@@ -10,7 +11,10 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const fecha = (params.fecha && parseFechaISO(params.fecha)) || hoy();
-  const parcelas = await obtenerParcelasConEstado(fecha);
+  const [parcelas, frigorificos] = await Promise.all([
+    obtenerParcelasConEstado(fecha),
+    obtenerEstadoFrigorificosEnFecha(fecha),
+  ]);
 
   return (
     <main className="w-full px-6 py-10">
@@ -20,7 +24,11 @@ export default async function Home({
           Ver histórico de reservas →
         </Link>
       </div>
-      <MapaParcelas parcelas={parcelas} fechaISO={formatFechaISO(fecha)} />
+      <MapaParcelas
+        parcelas={parcelas}
+        frigorificos={frigorificos}
+        fechaISO={formatFechaISO(fecha)}
+      />
     </main>
   );
 }
