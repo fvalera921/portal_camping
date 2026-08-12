@@ -53,6 +53,7 @@ export default function PanelReserva({
   const [frigorificoNumero, setFrigorificoNumero] = useState<number | null>(null);
   const [frigorificoEntradaISO, setFrigorificoEntradaISO] = useState(fechaEntradaISO);
   const [frigorificoSalidaISO, setFrigorificoSalidaISO] = useState(fechaSalidaISO);
+  const [frigorificoFechasManual, setFrigorificoFechasManual] = useState(false);
   const [disponibilidadFrigorificos, setDisponibilidadFrigorificos] = useState<FrigorificoDisponibilidad[]>([]);
   const [frigorificoError, setFrigorificoError] = useState(false);
 
@@ -125,18 +126,24 @@ export default function PanelReserva({
     }
   }
 
-  // El rango del frigorifico por defecto sigue al de la parcela; si el usuario ya lo habia
-  // acotado manualmente, se recorta aqui mismo para seguir cabiendo dentro del nuevo rango.
+  // El rango del frigorifico por defecto sigue al de la parcela (se mueve entero con ella).
+  // En cuanto el usuario lo acota manualmente (ver onCambiarFechaEntrada/Salida mas abajo),
+  // deja de seguirla al completo y solo se recorta lo justo para seguir cabiendo dentro del
+  // nuevo rango de la parcela.
   function cambiarFechaEntrada(valor: string) {
     setFechaEntradaISO(valor);
     actualizarTemporadaSugerida(valor, fechaSalidaISO);
-    setFrigorificoEntradaISO((actual) => (actual < valor ? valor : actual));
+    setFrigorificoEntradaISO((actual) =>
+      frigorificoFechasManual ? (actual < valor ? valor : actual) : valor,
+    );
   }
 
   function cambiarFechaSalida(valor: string) {
     setFechaSalidaISO(valor);
     actualizarTemporadaSugerida(fechaEntradaISO, valor);
-    setFrigorificoSalidaISO((actual) => (actual > valor ? valor : actual));
+    setFrigorificoSalidaISO((actual) =>
+      frigorificoFechasManual ? (actual > valor ? valor : actual) : valor,
+    );
   }
 
   function cambiarTemporada(valor: Temporada) {
@@ -269,8 +276,14 @@ export default function PanelReserva({
         onNumeroChange={setFrigorificoNumero}
         fechaEntradaISO={frigorificoEntradaISO}
         fechaSalidaISO={frigorificoSalidaISO}
-        onCambiarFechaEntrada={setFrigorificoEntradaISO}
-        onCambiarFechaSalida={setFrigorificoSalidaISO}
+        onCambiarFechaEntrada={(valor) => {
+          setFrigorificoFechasManual(true);
+          setFrigorificoEntradaISO(valor);
+        }}
+        onCambiarFechaSalida={(valor) => {
+          setFrigorificoFechasManual(true);
+          setFrigorificoSalidaISO(valor);
+        }}
         fechaEntradaMinISO={fechaEntradaISO}
         fechaSalidaMaxISO={fechaSalidaISO}
         disponibilidad={disponibilidadEfectiva}
