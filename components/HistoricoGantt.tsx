@@ -136,6 +136,14 @@ export default function HistoricoGantt({
             />
           )}
 
+          {dias.map((_, i) => (
+            <div
+              key={`separador-${i}`}
+              className="border-r border-dashed border-neutral-300"
+              style={{ gridColumn: i + 2, gridRow: `1 / ${totalFilas + 1}` }}
+            />
+          ))}
+
           {parcelas.map((parcela, indice) => (
             <Link
               key={parcela.id}
