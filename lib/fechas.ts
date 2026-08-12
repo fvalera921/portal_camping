@@ -34,6 +34,18 @@ export function formatFechaCorta(fecha: Date): string {
   return `${dia}/${mes}`;
 }
 
+const DIAS_SEMANA_CORTOS = ["D", "L", "M", "X", "J", "V", "S"];
+
+export function formatDiaSemanaCorto(fecha: Date): string {
+  return DIAS_SEMANA_CORTOS[fecha.getDay()];
+}
+
+export function sumarDias(fecha: Date, dias: number): Date {
+  const resultado = inicioDia(fecha);
+  resultado.setDate(resultado.getDate() + dias);
+  return resultado;
+}
+
 export function diferenciaEnNoches(fechaEntrada: Date, fechaSalida: Date): number {
   const msPorDia = 24 * 60 * 60 * 1000;
   return Math.round(

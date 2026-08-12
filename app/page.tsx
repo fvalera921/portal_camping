@@ -1,3 +1,4 @@
+import Link from "next/link";
 import MapaParcelas from "@/components/MapaParcelas";
 import { obtenerParcelasConEstado } from "@/lib/estadoParcela";
 import { formatFechaISO, hoy, parseFechaISO } from "@/lib/fechas";
@@ -13,7 +14,12 @@ export default async function Home({
 
   return (
     <main className="w-full px-6 py-10">
-      <h1 className="mb-6 text-2xl font-bold text-neutral-900">Mapa de parcelas</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold text-neutral-900">Mapa de parcelas</h1>
+        <Link href="/historico" className="text-sm text-neutral-500 hover:underline">
+          Ver histórico de reservas →
+        </Link>
+      </div>
       <MapaParcelas parcelas={parcelas} fechaISO={formatFechaISO(fecha)} />
     </main>
   );
