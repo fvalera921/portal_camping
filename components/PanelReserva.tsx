@@ -54,6 +54,7 @@ export default function PanelReserva({
   const [frigorificoEntradaISO, setFrigorificoEntradaISO] = useState(fechaEntradaISO);
   const [frigorificoSalidaISO, setFrigorificoSalidaISO] = useState(fechaSalidaISO);
   const [disponibilidadFrigorificos, setDisponibilidadFrigorificos] = useState<FrigorificoDisponibilidad[]>([]);
+  const [frigorificoError, setFrigorificoError] = useState(false);
 
   const tarifasSinFrigorifico = useMemo(
     () => tarifas.filter((tarifa) => tarifa.concepto !== CONCEPTO_FRIGORIFICO),
@@ -95,12 +96,20 @@ export default function PanelReserva({
     if (nochesFrigorifico <= 0) return;
     let cancelado = false;
     fetch(`/api/frigorificos?fechaEntrada=${frigorificoEntradaISO}&fechaSalida=${frigorificoSalidaISO}`)
-      .then((respuesta) => (respuesta.ok ? respuesta.json() : { frigorificos: [] }))
+      .then((respuesta) => {
+        if (!respuesta.ok) throw new Error("No se pudo consultar la disponibilidad");
+        return respuesta.json();
+      })
       .then((data) => {
-        if (!cancelado) setDisponibilidadFrigorificos(data.frigorificos ?? []);
+        if (cancelado) return;
+        setDisponibilidadFrigorificos(data.frigorificos ?? []);
+        setFrigorificoError(false);
       })
       .catch(() => {
-        if (!cancelado) setDisponibilidadFrigorificos([]);
+        if (!cancelado) {
+          setDisponibilidadFrigorificos([]);
+          setFrigorificoError(true);
+        }
       });
     return () => {
       cancelado = true;
@@ -265,6 +274,7 @@ export default function PanelReserva({
         fechaEntradaMinISO={fechaEntradaISO}
         fechaSalidaMaxISO={fechaSalidaISO}
         disponibilidad={disponibilidadEfectiva}
+        error={frigorificoError}
         precioUnitarioCentimos={precioUnitarioFrigorificoCentimos}
         noches={nochesFrigorifico}
         subtotalCentimos={lineaFrigorifico?.subtotalCentimos ?? 0}

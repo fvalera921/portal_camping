@@ -27,12 +27,6 @@ const ESTILO_ESTADO: Record<
   },
 };
 
-const ABREVIATURA_TIPO: Record<TipoParcela, string> = {
-  TIENDA: "Tienda",
-  CARAVANA: "Carav.",
-  AUTOCARAVANA: "Autoc.",
-};
-
 const ETIQUETA_TIPO: Record<TipoParcela, string> = {
   TIENDA: "Tienda",
   CARAVANA: "Caravana",
@@ -52,10 +46,7 @@ function ParcelaCelda({ parcela, fechaISO }: { parcela: ParcelaConEstado; fechaI
       title={descripcion}
       className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border-2 p-1 text-center transition hover:brightness-95 ${estilo.fondo} ${estilo.borde} ${estilo.texto}`}
     >
-      <span className="text-xs font-bold">{parcela.numero}</span>
-      <span className="text-[10px] leading-none">{ABREVIATURA_TIPO[parcela.tipo]}</span>
-      {parcela.tieneElectricidad && <span className="text-[9px] leading-none">Con luz</span>}
-      <span className="text-[9px] leading-none font-medium">{estilo.etiqueta}</span>
+      <span className="text-sm font-bold">{parcela.numero}</span>
     </Link>
   );
 }

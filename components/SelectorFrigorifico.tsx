@@ -16,6 +16,7 @@ export default function SelectorFrigorifico({
   fechaEntradaMinISO,
   fechaSalidaMaxISO,
   disponibilidad,
+  error,
   precioUnitarioCentimos,
   noches,
   subtotalCentimos,
@@ -31,11 +32,13 @@ export default function SelectorFrigorifico({
   fechaEntradaMinISO: string;
   fechaSalidaMaxISO: string;
   disponibilidad: FrigorificoDisponibilidad[];
+  error: boolean;
   precioUnitarioCentimos: number | null;
   noches: number;
   subtotalCentimos: number;
 }) {
   const hayDisponibles = disponibilidad.some((f) => f.disponible);
+  const fechasInvalidas = noches <= 0;
 
   return (
     <fieldset className="space-y-3 rounded-md border border-neutral-200 p-3">
@@ -51,10 +54,21 @@ export default function SelectorFrigorifico({
         Añadir frigorífico
       </label>
 
-      {!hayDisponibles && (
+      {fechasInvalidas ? (
         <p className="text-sm text-neutral-500">
-          No hay frigoríficos disponibles para estas fechas: solo hay 8 y están todos ocupados.
+          Selecciona un rango de fechas válido para ver la disponibilidad.
         </p>
+      ) : error ? (
+        <p className="text-sm text-red-600">
+          No se pudo comprobar la disponibilidad de los frigoríficos. Inténtalo de nuevo.
+        </p>
+      ) : (
+        disponibilidad.length > 0 &&
+        !hayDisponibles && (
+          <p className="text-sm text-neutral-500">
+            No hay frigoríficos disponibles para estas fechas: solo hay 8 y están todos ocupados.
+          </p>
+        )
       )}
 
       {activo && hayDisponibles && (

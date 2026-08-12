@@ -12,7 +12,7 @@ export default async function Home({
   const parcelas = await obtenerParcelasConEstado(fecha);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="w-full px-6 py-10">
       <h1 className="mb-6 text-2xl font-bold text-neutral-900">Mapa de parcelas</h1>
       <MapaParcelas parcelas={parcelas} fechaISO={formatFechaISO(fecha)} />
     </main>
