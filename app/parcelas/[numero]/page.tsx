@@ -65,6 +65,13 @@ export default async function ParcelaDetallePage({
   const reservaVigente = parcela.reservas.find((reserva) => reservaCubreFecha(reserva, fecha));
   const estado = determinarEstado(Boolean(reservaVigente), fecha);
   const tarifas = estado === "LIBRE" ? await prisma.tarifa.findMany({ orderBy: { concepto: "asc" } }) : [];
+  const ESTADOS_ACTIVOS = new Set(["CONFIRMADA", "EN_CURSO"]);
+  const reservasActivas = parcela.reservas
+    .filter((reserva) => ESTADOS_ACTIVOS.has(reserva.estado))
+    .map((reserva) => ({
+      fechaEntradaISO: formatFechaISO(reserva.fechaEntrada),
+      fechaSalidaISO: formatFechaISO(reserva.fechaSalida),
+    }));
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-6 py-10">
@@ -80,7 +87,12 @@ export default async function ParcelaDetallePage({
       </div>
 
       {estado === "LIBRE" && (
-        <PanelReserva parcelaId={parcela.id} tarifas={tarifas} fechaInicialISO={fechaISO} />
+        <PanelReserva
+          parcelaId={parcela.id}
+          tarifas={tarifas}
+          fechaInicialISO={fechaISO}
+          reservasActivas={reservasActivas}
+        />
       )}
 
       {estado !== "LIBRE" && reservaVigente && (

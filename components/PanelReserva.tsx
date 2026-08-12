@@ -15,16 +15,34 @@ import type { Temporada } from "@/app/generated/prisma/enums";
 
 const CONCEPTO_FRIGORIFICO = "FRIGORIFICO";
 
+export type ReservaActivaFechas = { fechaEntradaISO: string; fechaSalidaISO: string };
+
 export default function PanelReserva({
   parcelaId,
   tarifas,
   fechaInicialISO,
+  reservasActivas = [],
 }: {
   parcelaId: number;
   tarifas: Tarifa[];
   fechaInicialISO: string;
+  reservasActivas?: ReservaActivaFechas[];
 }) {
   const router = useRouter();
+
+  const rangosBloqueados = useMemo(
+    () =>
+      reservasActivas
+        .map((reserva) => ({
+          fechaEntrada: parseFechaISO(reserva.fechaEntradaISO),
+          fechaSalida: parseFechaISO(reserva.fechaSalidaISO),
+        }))
+        .filter(
+          (rango): rango is { fechaEntrada: Date; fechaSalida: Date } =>
+            rango.fechaEntrada !== null && rango.fechaSalida !== null,
+        ),
+    [reservasActivas],
+  );
 
   const [fechaEntradaISO, setFechaEntradaISO] = useState(fechaInicialISO);
   const [fechaSalidaISO, setFechaSalidaISO] = useState(() => {
@@ -252,6 +270,7 @@ export default function PanelReserva({
         onCambiarEntrada={cambiarFechaEntrada}
         onCambiarSalida={cambiarFechaSalida}
         noches={noches}
+        rangosBloqueados={rangosBloqueados}
       />
 
       <SelectorTemporada temporada={temporada} onCambiar={cambiarTemporada} />
