@@ -26,6 +26,13 @@ export type ParcelaConEstado = {
   notas: string | null;
   estado: EstadoParcela;
   reserva: ReservaActivaResumen | null;
+  /**
+   * LIBRE en la fecha consultada pero con otra reserva confirmada que empieza mas adelante
+   * (p.ej. hoy no hay nadie, pero mañana entra alguien). "RESERVADA" solo puede darse cuando
+   * la fecha que se esta viendo cae dentro de una reserva futura; al ver "hoy" eso nunca
+   * ocurre, asi que sin este campo esas parcelas parecerian libres sin matices.
+   */
+  tieneReservaFutura: boolean;
 };
 
 const ESTADOS_ACTIVOS = new Set(["CONFIRMADA", "EN_CURSO"]);
@@ -55,7 +62,7 @@ export async function obtenerParcelasConEstado(fecha: Date): Promise<ParcelaConE
   const diaSiguiente = new Date(dia);
   diaSiguiente.setDate(dia.getDate() + 1);
 
-  const [parcelas, reservasDelDia] = await Promise.all([
+  const [parcelas, reservasDelDia, reservasFuturas] = await Promise.all([
     prisma.parcela.findMany({ orderBy: { numero: "asc" } }),
     prisma.reserva.findMany({
       where: {
@@ -80,17 +87,23 @@ export async function obtenerParcelasConEstado(fecha: Date): Promise<ParcelaConE
         frigorifico: { select: { numero: true } },
       },
     }),
+    prisma.reserva.findMany({
+      where: { estado: { in: ["CONFIRMADA", "EN_CURSO"] }, fechaEntrada: { gt: dia } },
+      select: { parcelaId: true },
+    }),
   ]);
 
   const reservaPorParcela = new Map(
     reservasDelDia.map((r) => [r.parcelaId, r] as const),
   );
+  const parcelasConReservaFutura = new Set(reservasFuturas.map((r) => r.parcelaId));
 
   return parcelas.map((parcela) => {
     const reserva = reservaPorParcela.get(parcela.id);
     return {
       ...parcela,
       estado: determinarEstado(reserva !== undefined, fecha),
+      tieneReservaFutura: reserva === undefined && parcelasConReservaFutura.has(parcela.id),
       reserva: reserva
         ? {
             id: reserva.id,
