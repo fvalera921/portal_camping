@@ -26,23 +26,31 @@ export default function ReservaVigente({
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function hacerCheckout() {
+  async function cambiarEstado(accion: "checkout" | "cancelar") {
     setProcesando(true);
     setError(null);
     try {
       const respuesta = await fetch(`/api/reservas/${reserva.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accion: "checkout" }),
+        body: JSON.stringify({ accion }),
       });
       if (!respuesta.ok) {
         const data = await respuesta.json().catch(() => null);
-        setError(data?.error ?? "No se pudo completar el checkout");
+        setError(
+          data?.error ?? (accion === "checkout" ? "No se pudo completar el checkout" : "No se pudo cancelar la reserva"),
+        );
         return;
       }
       router.refresh();
     } finally {
       setProcesando(false);
+    }
+  }
+
+  function hacerCancelacion() {
+    if (window.confirm(`¿Cancelar la reserva de ${reserva.clienteNombre}? Esta acción no se puede deshacer.`)) {
+      cambiarEstado("cancelar");
     }
   }
 
@@ -75,11 +83,21 @@ export default function ReservaVigente({
       {estadoParcela === "OCUPADA" && (
         <button
           type="button"
-          onClick={hacerCheckout}
+          onClick={() => cambiarEstado("checkout")}
           disabled={procesando}
           className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
         >
           {procesando ? "Procesando..." : "Check-out (liberar parcela)"}
+        </button>
+      )}
+      {estadoParcela === "RESERVADA" && (
+        <button
+          type="button"
+          onClick={hacerCancelacion}
+          disabled={procesando}
+          className="rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-40"
+        >
+          {procesando ? "Procesando..." : "Cancelar reserva"}
         </button>
       )}
       {error && (
